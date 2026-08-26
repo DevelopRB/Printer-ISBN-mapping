@@ -1,0 +1,32 @@
+# Backend
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+data/
+logs/
+*.db
+
+# Secrets — never commit
+.env
+backend/.env
+packaging/printer.env
+*.pem
+*.key
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# Electron / packaging
+node_modules/
+release/
+packaging/*.spec
+packaging/__pycache__/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log

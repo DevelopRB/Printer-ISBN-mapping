@@ -1,0 +1,77 @@
+{
+  "name": "printing-reconciliation",
+  "version": "1.0.0",
+  "description": "Printing Reconciliation — desktop app for Operations",
+  "author": "Rare Biblio",
+  "private": true,
+  "main": "electron/main.js",
+  "scripts": {
+    "electron:dev": "npm run build:frontend && electron .",
+    "build:frontend": "npm --prefix frontend run build",
+    "build:backend": "powershell -ExecutionPolicy Bypass -File scripts/build-backend.ps1",
+    "build": "npm run build:frontend && npm run build:backend",
+    "dist:win": "npm run build && electron-builder --win nsis --x64",
+    "pack:dir": "npm run build && electron-builder --win dir --x64"
+  },
+  "devDependencies": {
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.rarebiblio.printingreconciliation",
+    "productName": "Printing Reconciliation",
+    "copyright": "Copyright © Rare Biblio",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "electron/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "release/backend",
+        "to": "backend"
+      },
+      {
+        "from": "frontend/dist",
+        "to": "frontend"
+      },
+      {
+        "from": ".env.example",
+        "to": "env.example"
+      },
+      {
+        "from": "packaging/printer.env",
+        "to": "printer.env",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "Printing-Reconciliation-Setup-${version}.${ext}",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Printing Reconciliation",
+      "uninstallDisplayName": "Printing Reconciliation",
+      "deleteAppDataOnUninstall": false
+    },
+    "asar": true
+  }
+}
