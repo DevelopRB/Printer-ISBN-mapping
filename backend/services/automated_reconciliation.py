@@ -37,14 +37,14 @@ from services.reconciliation import (
 
 STEP_DEFS = [
     ("prepare_list_a", "Preparing List A"),
-    ("connect", "Connecting to printer"),
-    ("authenticate", "Authenticating"),
-    ("fetch", "Fetching job log"),
-    ("download", "Downloading printer data"),
-    ("process", "Processing printer records"),
-    ("extract", "Extracting ISBNs"),
-    ("match", "Matching ISBNs"),
-    ("generate", "Generating results"),
+    ("connect", "Connect to Printer"),
+    ("authenticate", "Sign in to printer"),
+    ("fetch", "Request printer data"),
+    ("download", "Download Printer Data"),
+    ("process", "Process printer records"),
+    ("extract", "Extract ISBNs"),
+    ("match", "Reconcile"),
+    ("generate", "Generate results"),
     ("complete", "Complete"),
 ]
 
@@ -122,6 +122,9 @@ def create_run(
     end = _parse_date(end_date)
     if start > end:
         raise ValueError("From date must be less than or equal to To date.")
+    today = date.today()
+    if start > today or end > today:
+        raise ValueError("Dates cannot be in the future. Please choose today or an earlier date.")
 
     slots = sorted({int(s) for s in printer_slots})
     if not slots or any(s not in (1, 2, 3) for s in slots):
@@ -277,6 +280,8 @@ def _execute_run_body(db: Session, run: AutomatedRun) -> None:
                     raw_payload = dict(rec.raw_fields) if rec.raw_fields else {}
                     raw_payload["_raw_4010_value"] = raw_4010
                     raw_payload["_original_filename"] = filename
+                    raw_payload["_job_id"] = rec.job_no
+                    raw_payload["_print_date"] = rec.printer_date
                     row = AutomatedPrinterRecord(
                         run_id=run.id,
                         download_id=download.id,
@@ -305,14 +310,18 @@ def _execute_run_body(db: Session, run: AutomatedRun) -> None:
             )
             printer_ok += 1
         except Exception as exc:
-            logger.info(
+            logger.exception(
                 "Printer fetch failed run=%s slot=%s error_type=%s",
                 run.id,
                 slot,
                 type(exc).__name__,
             )
+            friendly = (
+                f"Unable to connect to {name}. "
+                "Please check that the computer is connected to the printer network."
+            )
             download.status = "FAILED"
-            download.error_message = str(exc)[:500]
+            download.error_message = friendly
             db.commit()
             for key in ("connect", "authenticate", "fetch", "download", "process"):
                 step_key = f"{key}_{slot}"
@@ -320,7 +329,7 @@ def _execute_run_body(db: Session, run: AutomatedRun) -> None:
                 for s in steps:
                     if s.get("key") == step_key and s.get("status") == "running":
                         s["status"] = "error"
-                        s["detail"] = str(exc)[:200]
+                        s["detail"] = friendly
                 # also mark remaining pending for this printer as skipped
                 for s in steps:
                     if s.get("printer_slot") == slot and s.get("status") == "pending":

@@ -23,7 +23,7 @@ def _sheets(buffer):
     return wb
 
 
-def test_sheet_names_and_order():
+def test_sheet_names_and_order_legacy_single_sheet():
     buf = build_normalized_workbook(
         ["8888001171897", "9789372259803"],
         [("8888001171897", "8888001171897_F2.pdf")],
@@ -38,6 +38,59 @@ def test_sheet_names_and_order():
     ]
 
 
+def test_multi_printer_separate_sheets():
+    buf = build_normalized_workbook(
+        ["8888001171897", "1111012883952"],
+        skipped_rows=[
+            (2, "CE Adjust", SKIP_REASON_NO_ISBN, "Printer 1"),
+            (5, "Details Counter", SKIP_REASON_NO_ISBN, "Printer 2"),
+        ],
+        printer_sheets=[
+            (
+                "Printer 1 ISBNs",
+                [("8888001171897", "2026-08-26", "8888001171897_F2.pdf")],
+            ),
+            (
+                "Printer 2 ISBNs",
+                [
+                    ("8888001171897", "2026-08-27", "8888001171897_F3.pdf"),
+                    ("1111012883952", "2026-08-27", "1111012883952_F2.pdf"),
+                ],
+            ),
+            (
+                "Printer 3 ISBNs",
+                [("9789372259803", "2026-08-25", "9789372259803_F2.pdf")],
+            ),
+        ],
+    )
+    wb = _sheets(buf)
+    assert wb.sheetnames == [
+        "List A ISBNs",
+        "Printer 1 ISBNs",
+        "Printer 2 ISBNs",
+        "Printer 3 ISBNs",
+        "Reconciliation",
+        "Skipped ISBNs",
+    ]
+    assert wb["Printer 1 ISBNs"].cell(2, 1).value == "8888001171897"
+    assert wb["Printer 2 ISBNs"].max_row == 3
+    assert wb["Printer 3 ISBNs"].cell(2, 1).value == "9789372259803"
+    # Reconciliation uses combined presence across printers
+    recon = wb["Reconciliation"]
+    assert recon.cell(1, 4).value == "Printer"
+    assert recon.cell(1, 5).value == "Status"
+    assert recon.cell(2, 5).value == PRESENT  # 8888… from P1/P2
+    assert recon.cell(3, 5).value == PRESENT  # 1111… from P2
+    # Print dates aggregated across printers for same ISBN
+    assert "26-Aug-2026" in (recon.cell(2, 3).value or "")
+    assert "27-Aug-2026" in (recon.cell(2, 3).value or "")
+    assert recon.cell(2, 4).value == "Printer 1, Printer 2"
+    assert recon.cell(3, 4).value == "Printer 2"
+    skip = wb["Skipped ISBNs"]
+    assert skip.cell(1, 1).value == "Printer"
+    assert skip.cell(2, 1).value == "Printer 1"
+
+
 def test_list_a_preserves_duplicates():
     buf = build_normalized_workbook(
         ["8888001171897", "8888001171897", "9789372259803"],
@@ -50,20 +103,26 @@ def test_list_a_preserves_duplicates():
 
 def test_printer_preserves_duplicates_and_filenames():
     rows = [
-        ("8888001171897", "8888001171897_F2.pdf"),
-        ("8888001171897", "8888001171897_F3.pdf"),
-        ("8888001171897", "8888001171897_F4.pdf"),
-        ("9789372259803", "9789372259803_F2.pdf"),
+        ("8888001171897", "2026-08-26", "8888001171897_F2.pdf"),
+        ("8888001171897", "2026-08-27", "8888001171897_F3.pdf"),
+        ("8888001171897", "2026-08-27", "8888001171897_F4.pdf"),
+        ("9789372259803", "2026-08-26", "9789372259803_F2.pdf"),
     ]
     buf = build_normalized_workbook(["8888001171897"], rows)
     ws = _sheets(buf)["Printer ISBNs"]
     assert ws.cell(1, 1).value == "ISBN"
-    assert ws.cell(1, 2).value == "Source Filename"
+    assert ws.cell(1, 2).value == "Print Date"
+    assert ws.cell(1, 3).value == "Source Filename"
     values = [
-        (ws.cell(r, 1).value, ws.cell(r, 2).value)
+        (ws.cell(r, 1).value, ws.cell(r, 2).value, ws.cell(r, 3).value)
         for r in range(2, ws.max_row + 1)
     ]
-    assert values == rows
+    assert values == [
+        ("8888001171897", "26-Aug-2026", "8888001171897_F2.pdf"),
+        ("8888001171897", "27-Aug-2026", "8888001171897_F3.pdf"),
+        ("8888001171897", "27-Aug-2026", "8888001171897_F4.pdf"),
+        ("9789372259803", "26-Aug-2026", "9789372259803_F2.pdf"),
+    ]
 
 
 def test_reconciliation_preserves_list_a_duplicates():
@@ -75,10 +134,10 @@ def test_reconciliation_preserves_list_a_duplicates():
         "9789375480896",
     ]
     printer = [
-        ("8888001171897", "a.pdf"),
-        ("8888001171897", "b.pdf"),
-        ("1111012883952", "c.pdf"),
-        ("9789372259803", "d.pdf"),
+        ("8888001171897", "2026-08-26", "a.pdf"),
+        ("8888001171897", "2026-08-27", "b.pdf"),
+        ("1111012883952", "2026-08-26", "c.pdf"),
+        ("9789372259803", "2026-08-26", "d.pdf"),
     ]
     buf = build_normalized_workbook(list_a, printer)
     ws = _sheets(buf)["Reconciliation"]
@@ -86,17 +145,19 @@ def test_reconciliation_preserves_list_a_duplicates():
         (
             ws.cell(r, 1).value,
             ws.cell(r, 2).value or "",
-            ws.cell(r, 3).value,
+            ws.cell(r, 3).value or "",
+            ws.cell(r, 4).value or "",
+            ws.cell(r, 5).value,
         )
         for r in range(2, ws.max_row + 1)
     ]
-    # Duplicate List A ISBN appears twice; printer duplicates do not add extra rows
+    # Same count/order as List A; printer duplicates do not add extra reconciliation rows
     assert rows == [
-        ("8888001171897", "8888001171897", PRESENT),
-        ("8888001171897", "8888001171897", PRESENT),
-        ("1111012883952", "1111012883952", PRESENT),
-        ("9789372259803", "9789372259803", PRESENT),
-        ("9789375480896", "", NOT_FOUND),
+        ("8888001171897", "8888001171897", "26-Aug-2026, 27-Aug-2026", "", PRESENT),
+        ("8888001171897", "8888001171897", "26-Aug-2026, 27-Aug-2026", "", PRESENT),
+        ("1111012883952", "1111012883952", "26-Aug-2026", "", PRESENT),
+        ("9789372259803", "9789372259803", "26-Aug-2026", "", PRESENT),
+        ("9789375480896", "", "", "", NOT_FOUND),
     ]
 
 
@@ -108,7 +169,7 @@ def test_printer_only_not_in_sheet3():
     ws = _sheets(buf)["Reconciliation"]
     assert ws.max_row == 2  # header + 1 data row
     assert ws.cell(2, 1).value == "8888001171897"
-    assert ws.cell(2, 3).value == PRESENT
+    assert ws.cell(2, 5).value == PRESENT
 
 
 def test_business_identifier_not_converted():
@@ -119,7 +180,7 @@ def test_business_identifier_not_converted():
     ws = _sheets(buf)["Reconciliation"]
     assert ws.cell(2, 1).value == "8888000240648"
     assert ws.cell(2, 2).value == "8888000240648"
-    assert ws.cell(2, 3).value == PRESENT
+    assert ws.cell(2, 5).value == PRESENT
     assert not str(ws.cell(2, 1).value).startswith("978888")
 
 

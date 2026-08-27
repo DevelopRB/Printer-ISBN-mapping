@@ -9,4 +9,4 @@ export function manualPrinterLabel(slot: number): string {
   const host = MANUAL_PRINTER_HOSTS[slot]
   return host ? `Printer ${slot} (${host})` : `Printer ${slot}`
 }
-
+

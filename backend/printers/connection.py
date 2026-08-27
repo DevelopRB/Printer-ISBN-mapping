@@ -29,16 +29,16 @@ CONNECTED = "connected"
 UNKNOWN_ERROR = "unknown_error"
 
 CATEGORY_LABELS = {
-    CONNECTION_REFUSED: "Connection refused",
-    CONNECTION_TIMEOUT: "Connection timeout",
-    HOST_UNREACHABLE: "Host unreachable",
-    AUTHENTICATION_FAILED: "Authentication failed",
-    SSL_TLS_ERROR: "SSL/TLS error",
-    ENDPOINT_UNAVAILABLE: "Endpoint unavailable",
-    INVALID_RESPONSE: "Invalid response",
-    CREDENTIALS_MISSING: "Credentials not configured",
+    CONNECTION_REFUSED: "Unable to connect to the printer. Please check that the computer is connected to the printer network.",
+    CONNECTION_TIMEOUT: "The printer did not respond in time. Please check that the computer is connected to the printer network.",
+    HOST_UNREACHABLE: "Unable to reach the printer. Please check that the computer is connected to the printer network.",
+    AUTHENTICATION_FAILED: "Could not sign in to the printer. Please ask IT to verify the printer password.",
+    SSL_TLS_ERROR: "Unable to open a secure connection to the printer. Please check the printer network connection.",
+    ENDPOINT_UNAVAILABLE: "Unable to connect to the printer. Please check that the computer is connected to the printer network.",
+    INVALID_RESPONSE: "The printer returned unexpected data. Please try again or ask IT for help.",
+    CREDENTIALS_MISSING: "Printer password is not configured. Please ask IT to set it up.",
     CONNECTED: "Connected",
-    UNKNOWN_ERROR: "Connection failed",
+    UNKNOWN_ERROR: "Unable to connect to the printer. Please check that the computer is connected to the printer network.",
 }
 
 

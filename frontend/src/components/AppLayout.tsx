@@ -10,8 +10,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
           <div className="flex gap-1 text-sm">
             <NavLink
-              to="/"
-              end
+              to="/printers"
               className={({ isActive }) =>
                 `rounded-md px-3 py-1.5 ${
                   isActive
@@ -20,7 +19,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 }`
               }
             >
-              Manual Reconciliation
+              Connect to Printer
             </NavLink>
             <NavLink
               to="/automated"
@@ -35,7 +34,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               Automated Reconciliation
             </NavLink>
             <NavLink
-              to="/printers"
+              to="/"
+              end
               className={({ isActive }) =>
                 `rounded-md px-3 py-1.5 ${
                   isActive
@@ -44,7 +44,19 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 }`
               }
             >
-              Printer Configuration
+              Manual Reconciliation
+            </NavLink>
+            <NavLink
+              to="/how-to"
+              className={({ isActive }) =>
+                `rounded-md px-3 py-1.5 ${
+                  isActive
+                    ? 'bg-slate-100 font-medium text-slate-900'
+                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                }`
+              }
+            >
+              How to use
             </NavLink>
           </div>
         </div>

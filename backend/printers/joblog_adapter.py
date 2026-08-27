@@ -40,9 +40,15 @@ COL_JOB_NO = "1122"
 COL_MODE = "4001"
 COL_USER = "4009"
 COL_FILENAME = "4010"
-COL_YEAR = "1000"
-COL_MONTH = "1001"
-COL_DAY = "1002"
+# Reception accept date parts (HTML indices 9–11). Kept for diagnostics.
+COL_ACCEPT_YEAR = "1000"
+COL_ACCEPT_MONTH = "1001"
+COL_ACCEPT_DAY = "1002"
+# CSV popup "Date" column uses makeJobDate(D[21]…D[26]) → column IDs 1006–1011.
+# Print Date for Operations must match that popup Date (not download/today/range).
+COL_PRINT_YEAR = "1006"
+COL_PRINT_MONTH = "1007"
+COL_PRINT_DAY = "1008"
 
 
 @dataclass
@@ -392,10 +398,17 @@ class JobLogCgiAdapter(BasePrinterAdapter):
 
             filename = col(COL_FILENAME)
             printer_date = compose_printer_date(
-                col(COL_YEAR) or "",
-                col(COL_MONTH) or "",
-                col(COL_DAY) or "",
+                col(COL_PRINT_YEAR) or "",
+                col(COL_PRINT_MONTH) or "",
+                col(COL_PRINT_DAY) or "",
             )
+            # Fallback to accept date if end/print date parts missing
+            if not printer_date:
+                printer_date = compose_printer_date(
+                    col(COL_ACCEPT_YEAR) or "",
+                    col(COL_ACCEPT_MONTH) or "",
+                    col(COL_ACCEPT_DAY) or "",
+                )
             raw = {cid: (col(cid) or "") for cid in index}
             records.append(
                 JobLogRecord(
@@ -438,9 +451,14 @@ class JobLogCgiAdapter(BasePrinterAdapter):
                 JobLogRecord(
                     source_filename=col(COL_FILENAME),
                     printer_date=compose_printer_date(
-                        col(COL_YEAR) or "",
-                        col(COL_MONTH) or "",
-                        col(COL_DAY) or "",
+                        col(COL_PRINT_YEAR) or "",
+                        col(COL_PRINT_MONTH) or "",
+                        col(COL_PRINT_DAY) or "",
+                    )
+                    or compose_printer_date(
+                        col(COL_ACCEPT_YEAR) or "",
+                        col(COL_ACCEPT_MONTH) or "",
+                        col(COL_ACCEPT_DAY) or "",
                     ),
                     job_no=col(COL_JOB_NO),
                     user_name=col(COL_USER),

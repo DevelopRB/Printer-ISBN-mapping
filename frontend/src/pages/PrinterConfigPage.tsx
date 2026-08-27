@@ -92,12 +92,11 @@ export function PrinterConfigPage() {
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">
-              Printer Configuration
+              Connect to Printer
             </h1>
             <p className="mt-1 max-w-3xl text-sm text-slate-500">
-              Network endpoints for job-log retrieval. Passwords are read from server environment
-              variables only and are never sent to the browser. Job-log download is not enabled yet
-              — connection testing only (Phase 2A/2B).
+              Test that each printer is reachable on the office network. Passwords stay on the
+              server and are never shown in the browser.
             </p>
           </div>
           <button
@@ -117,10 +116,11 @@ export function PrinterConfigPage() {
         )}
 
         <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          Set <code className="font-mono text-xs">PRINTER_n_PASSWORD</code> in the project{' '}
-          <code className="font-mono text-xs">.env</code> file on the backend host. HTTPS printers
-          use <code className="font-mono text-xs">PRINTER_VERIFY_SSL</code> (default false for
-          internal self-signed certificates — MitM risk on untrusted networks).
+          <div className="font-medium">Admin / IT only</div>
+          <div className="mt-1">
+            Printer passwords are configured on the server. If a connection fails, ask IT to
+            confirm the computer is on the printer network and that printer credentials are set.
+          </div>
         </div>
 
         {loading ? (
@@ -171,22 +171,16 @@ export function PrinterConfigPage() {
                   </div>
 
                   <dl className="space-y-2 text-sm">
-                    <Row label="Endpoint" value={printer.display_endpoint} mono />
-                    <Row label="Base URL" value={printer.base_url} mono />
-                    <Row label="Job log path" value={printer.joblog_path} mono />
+                    <Row label="Address" value={printer.display_endpoint} mono />
                     <Row
-                      label="Username env"
-                      value={`${printer.username_env}${printer.username_configured ? ' ✓' : ' (default admin)'}`}
-                    />
-                    <Row
-                      label="Password env"
-                      value={`${printer.password_env}${printer.password_configured ? ' ✓ set' : ' ✕ missing'}`}
+                      label="Password"
+                      value={printer.password_configured ? 'Configured' : 'Not configured — ask IT'}
                     />
                     {printer.protocol === 'https' && (
-                      <Row
-                        label="SSL verify"
-                        value={printer.verify_ssl ? 'enabled' : 'disabled (internal)'}
-                      />
+                      <Row label="Secure connection" value="Yes (office network)" />
+                    )}
+                    {printer.protocol === 'http' && (
+                      <Row label="Secure connection" value="Standard (office network)" />
                     )}
                   </dl>
 
@@ -303,14 +297,12 @@ function formatMeta(
 ): string {
   const parts: string[] = []
   const latency = result?.latency_ms ?? printer.last_connection_latency_ms
-  const http = result?.http_status ?? printer.last_connection_http_status
-  if (latency != null) parts.push(`${latency} ms`)
-  if (http != null) parts.push(`HTTP ${http}`)
+  if (latency != null) parts.push(`Response time ${latency} ms`)
   if (checkedAt) {
     try {
-      parts.push(new Date(checkedAt).toLocaleString())
+      parts.push(`Checked ${new Date(checkedAt).toLocaleString()}`)
     } catch {
-      parts.push(checkedAt)
+      parts.push(`Checked ${checkedAt}`)
     }
   }
   return parts.join(' · ')

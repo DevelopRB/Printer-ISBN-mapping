@@ -141,7 +141,7 @@ async def upload_list_a_for_automation(
     project = _ensure_default_project(db)
     suffix = Path(file.filename or "list.xlsx").suffix.lower()
     if suffix not in {".xlsx", ".xls", ".csv"}:
-        raise HTTPException(status_code=400, detail="Unsupported file type.")
+        raise HTTPException(status_code=400, detail="Please upload a valid List A file.")
 
     dest_dir = UPLOADS_DIR / str(project.id)
     dest_dir.mkdir(parents=True, exist_ok=True)
@@ -157,7 +157,7 @@ async def upload_list_a_for_automation(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         logger.exception("List A upload for automation failed")
-        raise HTTPException(status_code=400, detail="Failed to process List A file.") from exc
+        raise HTTPException(status_code=400, detail="Please upload a valid List A file.") from exc
 
     upload = Upload(
         project_id=project.id,
