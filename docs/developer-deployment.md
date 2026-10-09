@@ -22,7 +22,7 @@ Writable runtime data:
 
 - Node.js 20+ (for Electron / electron-builder)
 - Python 3.12 venv at `backend/.venv` with `backend/requirements.txt`
-- Project `.env` with printer credentials (used to seed first-run `printer.env`)
+- Project `.env` with printer credentials for local development only (never packaged)
 
 ## One-command Windows installer
 
@@ -43,7 +43,9 @@ What the script does:
 
 1. `npm run build:frontend` — Vite production build → `frontend/dist`
 2. `npm run build:backend` — PyInstaller onedir → `release/backend/PrintingReconciliationAPI.exe`
-3. `electron-builder --win nsis --x64` — NSIS installer
+3. `npm run check:secrets` — fails the build if any packaged file contains an env file or a
+   PASSWORD / SECRET / TOKEN / API_KEY value
+4. `electron-builder --win nsis --x64` — NSIS installer
 
 ## Development with Electron shell
 
@@ -69,9 +71,9 @@ Printer IPs/ports remain the seeded defaults (editable in-app on Printers page).
 
 Credentials:
 
-1. Preferred: put real values in project `.env` before `npm run dist:win`  
-   → copied to `packaging/printer.env` → seeded into each user’s AppData on first launch.
-2. Or edit `%APPDATA%\Printing Reconciliation\.env` after install (IT only).
+The installer never contains credentials. On first launch each user's
+`%APPDATA%\Printing Reconciliation\.env` is seeded from the bundled `env.example` (empty
+passwords); IT then fills in the passwords on that machine.
 
 **Never** put passwords in frontend code or expose them via preload/renderer APIs.
 

@@ -29,16 +29,14 @@ New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 New-Item -ItemType Directory -Force -Path $WorkDir | Out-Null
 New-Item -ItemType Directory -Force -Path $SpecDir | Out-Null
 
-# Seed printer.env for installer (backend-only; never shipped to renderer)
-$PackagingEnv = Join-Path $SpecDir "printer.env"
-$ProjectEnv = Join-Path $Root ".env"
-$ExampleEnv = Join-Path $Root ".env.example"
-if (Test-Path $ProjectEnv) {
-  Copy-Item $ProjectEnv $PackagingEnv -Force
-  Write-Host "Copied project .env -> packaging/printer.env (for first-run seed)"
-} elseif (-not (Test-Path $PackagingEnv)) {
-  Copy-Item $ExampleEnv $PackagingEnv -Force
-  Write-Host "Created packaging/printer.env from .env.example (fill passwords before distributing)"
+# The installer never carries real credentials. Electron seeds each user's
+# %APPDATA%\Printing Reconciliation\.env from the bundled env.example (empty passwords);
+# IT fills the passwords in on the machine. A stale packaging/printer.env from older
+# builds held a copy of the project .env, so it is removed here.
+$StalePackagingEnv = Join-Path $SpecDir "printer.env"
+if (Test-Path $StalePackagingEnv) {
+  Remove-Item $StalePackagingEnv -Force
+  Write-Host "Removed stale packaging/printer.env (installer seeds from env.example)"
 }
 
 Push-Location $Backend

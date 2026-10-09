@@ -10,8 +10,9 @@
     "build:frontend": "npm --prefix frontend run build",
     "build:backend": "powershell -ExecutionPolicy Bypass -File scripts/build-backend.ps1",
     "build": "npm run build:frontend && npm run build:backend",
-    "dist:win": "npm run build && electron-builder --win nsis --x64",
-    "pack:dir": "npm run build && electron-builder --win dir --x64"
+    "check:secrets": "powershell -ExecutionPolicy Bypass -File scripts/check-no-secrets.ps1",
+    "dist:win": "npm run build && npm run check:secrets && electron-builder --win nsis --x64",
+    "pack:dir": "npm run build && npm run check:secrets && electron-builder --win dir --x64"
   },
   "devDependencies": {
     "electron": "^33.2.1",
@@ -41,13 +42,6 @@
       {
         "from": ".env.example",
         "to": "env.example"
-      },
-      {
-        "from": "packaging/printer.env",
-        "to": "printer.env",
-        "filter": [
-          "**/*"
-        ]
       }
     ],
     "win": {
