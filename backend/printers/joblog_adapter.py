@@ -44,11 +44,32 @@ COL_FILENAME = "4010"
 COL_ACCEPT_YEAR = "1000"
 COL_ACCEPT_MONTH = "1001"
 COL_ACCEPT_DAY = "1002"
+COL_ACCEPT_HH = "1003"
+COL_ACCEPT_MM = "1004"
+COL_ACCEPT_SS = "1005"
 # CSV popup "Date" column uses makeJobDate(D[21]…D[26]) → column IDs 1006–1011.
 # Print Date for Operations must match that popup Date (not download/today/range).
 COL_PRINT_YEAR = "1006"
 COL_PRINT_MONTH = "1007"
 COL_PRINT_DAY = "1008"
+# Job End time parts (same end-date group as Print Date): 1009–1011
+COL_JOB_END_HH = "1009"
+COL_JOB_END_MM = "1010"
+COL_JOB_END_SS = "1011"
+# Print Start time parts: 1288–1290 (date parts 1285–1287 unused for display)
+COL_PRINT_START_HH = "1288"
+COL_PRINT_START_MM = "1289"
+COL_PRINT_START_SS = "1290"
+# Convert CSV popup Result / Set Number / Output Set (confirmed against live TSV)
+COL_RESULT = "4005"
+COL_SET_NUMBER = "2003"
+COL_OUTPUT_SET = "1047"
+
+# AccurioPress joblog Result codes as shown in Convert CSV popup text.
+RESULT_CODE_LABELS = {
+    "0": "Complete",
+    "6": "Canceled",
+}
 
 
 @dataclass
@@ -58,6 +79,12 @@ class JobLogRecord:
     job_no: str | None = None
     user_name: str | None = None
     mode: str | None = None
+    job_end: str | None = None
+    print_start: str | None = None
+    job_accept: str | None = None
+    result: str | None = None
+    set_number: str | None = None
+    output_set: str | None = None
     raw_fields: dict[str, str] = field(default_factory=dict)
 
 
@@ -96,6 +123,79 @@ def compose_printer_date(yy: str, mm: str, dd: str) -> str | None:
         return f"{year:04d}-{int(mm):02d}-{int(dd):02d}"
     except ValueError:
         return f"{yy}-{mm}-{dd}"
+
+
+def compose_printer_time(hh: str | None, mm: str | None, ss: str | None) -> str | None:
+    """Compose HH:MM:SS from printer CSV time parts (printer-local; no TZ convert)."""
+    if hh in (None, "") and mm in (None, "") and ss in (None, ""):
+        return None
+    try:
+        return f"{int(hh or 0):02d}:{int(mm or 0):02d}:{int(ss or 0):02d}"
+    except (TypeError, ValueError):
+        parts = [str(hh or "0"), str(mm or "0"), str(ss or "0")]
+        return ":".join(parts)
+
+
+def decode_result_code(raw: str | None) -> str | None:
+    """Map Result column code to Convert CSV popup label; preserve unknown codes."""
+    if raw is None:
+        return None
+    text = str(raw).strip()
+    if not text:
+        return None
+    return RESULT_CODE_LABELS.get(text, text)
+
+
+def compose_job_fields_from_raw(raw: dict[str, str] | None) -> dict[str, str | None]:
+    """Derive same-row job display fields from numeric TSV column IDs / enriched keys."""
+    data = raw or {}
+
+    def pick(*keys: str) -> str | None:
+        for key in keys:
+            val = data.get(key)
+            if val is not None and str(val).strip() != "":
+                return str(val).strip()
+        return None
+
+    job_end = pick("_job_end") or compose_printer_time(
+        pick(COL_JOB_END_HH), pick(COL_JOB_END_MM), pick(COL_JOB_END_SS)
+    )
+    print_start = pick("_print_start") or compose_printer_time(
+        pick(COL_PRINT_START_HH), pick(COL_PRINT_START_MM), pick(COL_PRINT_START_SS)
+    )
+    job_accept = pick("_job_accept") or compose_printer_time(
+        pick(COL_ACCEPT_HH), pick(COL_ACCEPT_MM), pick(COL_ACCEPT_SS)
+    )
+    result_raw = pick("_result_code", COL_RESULT)
+    result = pick("_result") or decode_result_code(result_raw)
+    set_number = pick("_set_number", COL_SET_NUMBER)
+    output_set = pick("_output_set", COL_OUTPUT_SET)
+    return {
+        "job_end": job_end,
+        "print_start": print_start,
+        "job_accept": job_accept,
+        "result": result,
+        "set_number": set_number,
+        "output_set": output_set,
+    }
+
+
+def _job_fields_from_cols(col) -> dict[str, str | None]:
+    """Build composed job fields using a column lookup callable col(cid) -> str|None."""
+    return {
+        "job_end": compose_printer_time(
+            col(COL_JOB_END_HH), col(COL_JOB_END_MM), col(COL_JOB_END_SS)
+        ),
+        "print_start": compose_printer_time(
+            col(COL_PRINT_START_HH), col(COL_PRINT_START_MM), col(COL_PRINT_START_SS)
+        ),
+        "job_accept": compose_printer_time(
+            col(COL_ACCEPT_HH), col(COL_ACCEPT_MM), col(COL_ACCEPT_SS)
+        ),
+        "result": decode_result_code(col(COL_RESULT)),
+        "set_number": (col(COL_SET_NUMBER) or None),
+        "output_set": (col(COL_OUTPUT_SET) or None),
+    }
 
 
 class JobLogCgiAdapter(BasePrinterAdapter):
@@ -410,6 +510,7 @@ class JobLogCgiAdapter(BasePrinterAdapter):
                     col(COL_ACCEPT_DAY) or "",
                 )
             raw = {cid: (col(cid) or "") for cid in index}
+            job = _job_fields_from_cols(col)
             records.append(
                 JobLogRecord(
                     source_filename=filename,
@@ -417,6 +518,12 @@ class JobLogCgiAdapter(BasePrinterAdapter):
                     job_no=col(COL_JOB_NO),
                     user_name=col(COL_USER),
                     mode=col(COL_MODE),
+                    job_end=job["job_end"],
+                    print_start=job["print_start"],
+                    job_accept=job["job_accept"],
+                    result=job["result"],
+                    set_number=(job["set_number"].strip() if job["set_number"] else None),
+                    output_set=(job["output_set"].strip() if job["output_set"] else None),
                     raw_fields=raw,
                 )
             )
@@ -447,6 +554,7 @@ class JobLogCgiAdapter(BasePrinterAdapter):
                     return None
                 return parts[i]
 
+            job = _job_fields_from_cols(col)
             records.append(
                 JobLogRecord(
                     source_filename=col(COL_FILENAME),
@@ -463,6 +571,12 @@ class JobLogCgiAdapter(BasePrinterAdapter):
                     job_no=col(COL_JOB_NO),
                     user_name=col(COL_USER),
                     mode=col(COL_MODE),
+                    job_end=job["job_end"],
+                    print_start=job["print_start"],
+                    job_accept=job["job_accept"],
+                    result=job["result"],
+                    set_number=(job["set_number"].strip() if job["set_number"] else None),
+                    output_set=(job["output_set"].strip() if job["output_set"] else None),
                     raw_fields={cid: (col(cid) or "") for cid in index},
                 )
             )

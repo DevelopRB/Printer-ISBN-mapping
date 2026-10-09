@@ -428,7 +428,7 @@ export type AutomatedRun = {
 
   id: number
 
-  list_a_upload_id: number
+  list_a_upload_id: number | null
 
   list_a_filename: string | null
 
@@ -505,3 +505,151 @@ export type PaginatedAutomatedResults = {
 }
 
 
+
+export type PrinterSearchOccurrence = {
+
+  isbn: string
+
+  print_date: string | null
+
+  printer_name: string
+
+  printer_slot: number
+
+  source_filename: string | null
+
+  source_row: number | null
+
+  job_id?: string | null
+
+  job_end?: string | null
+
+  print_start?: string | null
+
+  job_accept?: string | null
+
+  result?: string | null
+
+  set_number?: string | null
+
+  output_set?: string | null
+
+}
+
+
+
+export type RunSearchData = {
+
+  run_id: number
+
+  start_date?: string | null
+
+  end_date?: string | null
+
+  list_a_isbns: string[]
+
+  printer_occurrences: PrinterSearchOccurrence[]
+
+}
+
+
+
+export type IsbnSearchStatus =
+  | 'PRESENT'
+  | 'NOT FOUND'
+  | 'FOUND IN PRINTER DATA'
+
+
+
+export type IsbnSearchResult = {
+
+  query: string
+
+  normalizedIsbn: string
+
+  /** null = no List A loaded for this search */
+  listA: boolean | null
+
+  printer: boolean
+
+  status: IsbnSearchStatus
+
+  occurrences: PrinterSearchOccurrence[]
+
+  startDate?: string | null
+
+  endDate?: string | null
+
+  printersSearched?: { slot: number; name: string; ok: boolean; error?: string | null }[]
+
+}
+
+
+
+export type DirectIsbnSearchResponse = {
+
+  query: string
+
+  normalized_isbn: string
+
+  start_date: string
+
+  end_date: string
+
+  list_a: boolean | null
+
+  printer: boolean
+
+  status: string
+
+  occurrences: PrinterSearchOccurrence[]
+
+  printers: {
+
+    slot: number
+
+    name: string
+
+    ok: boolean
+
+    record_count: number
+
+    match_count: number
+
+    error: string | null
+
+  }[]
+
+  steps: { label?: string; status?: string; detail?: string; printer_slot?: number }[]
+
+}
+
+
+export type DirectBatchItemResponse = {
+  query: string
+  normalized_isbn: string
+  list_a: boolean | null
+  printer: boolean
+  status: string
+  occurrences: PrinterSearchOccurrence[]
+}
+
+export type DirectMultiIsbnSearchResponse = {
+  start_date: string
+  end_date: string
+  entered_count: number
+  unique_count: number
+  found_count: number
+  not_found_count: number
+  connection_issue_count: number
+  results: DirectBatchItemResponse[]
+  printers: {
+    slot: number
+    name: string
+    ok: boolean
+    record_count: number
+    match_count: number
+    error: string | null
+  }[]
+  steps: { label?: string; status?: string; detail?: string; printer_slot?: number }[]
+}

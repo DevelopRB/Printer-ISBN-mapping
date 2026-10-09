@@ -159,7 +159,9 @@ class AutomatedRun(Base):
     __tablename__ = "automated_runs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    list_a_upload_id: Mapped[int] = mapped_column(ForeignKey("uploads.id"), nullable=False)
+    list_a_upload_id: Mapped[int | None] = mapped_column(
+        ForeignKey("uploads.id"), nullable=True
+    )
     printer_slots_json: Mapped[str] = mapped_column(Text, nullable=False)  # e.g. [1,2]
     start_date: Mapped[str] = mapped_column(String(10), nullable=False)  # YYYY-MM-DD
     end_date: Mapped[str] = mapped_column(String(10), nullable=False)

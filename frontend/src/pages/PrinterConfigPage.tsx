@@ -1,121 +1,95 @@
-import { useCallback, useEffect, useState } from 'react'
-import { CheckCircle2, Loader2, RefreshCw, XCircle } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Loader2, RefreshCw } from 'lucide-react'
 import { AppLayout } from '../components/AppLayout'
-import {
-  listNetworkPrinters,
-  testNetworkPrinterConnection,
-  updateNetworkPrinter,
-} from '../services/api'
-import type { ConnectionTestResult, NetworkPrinterConfig } from '../types'
-
-type TestState = {
-  loading?: boolean
-  result?: ConnectionTestResult
-  error?: string
-}
+import { updateNetworkPrinter } from '../services/api'
+import { usePrinterHealth } from '../lib/printerHealth'
 
 export function PrinterConfigPage() {
-  const [printers, setPrinters] = useState<NetworkPrinterConfig[]>([])
-  const [loading, setLoading] = useState(true)
+  const {
+    printers,
+    live,
+    loadingConfigs,
+    configError,
+    refreshConfigs,
+    reloadPrinterNames,
+    checkSlot,
+    reportOperationFailures,
+  } = usePrinterHealth()
+
   const [error, setError] = useState<string | null>(null)
-  const [tests, setTests] = useState<Record<number, TestState>>({})
   const [savingSlot, setSavingSlot] = useState<number | null>(null)
   const [draftNames, setDraftNames] = useState<Record<number, string>>({})
-
-  const refresh = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const rows = await listNetworkPrinters()
-      setPrinters(rows)
-      setDraftNames(Object.fromEntries(rows.map((p) => [p.slot, p.name])))
-    } catch {
-      setError('Could not load printer configuration. Is the backend running?')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  const seededRef = useRef(false)
 
   useEffect(() => {
-    void refresh()
-  }, [refresh])
+    if (printers.length && !seededRef.current) {
+      setDraftNames(Object.fromEntries(printers.map((p) => [p.slot, p.name])))
+      seededRef.current = true
+    } else if (printers.length) {
+      setDraftNames((prev) => {
+        const next = { ...prev }
+        for (const p of printers) {
+          if (next[p.slot] == null) next[p.slot] = p.name
+        }
+        return next
+      })
+    }
+  }, [printers])
+
+  useEffect(() => {
+    if (configError) setError(configError)
+  }, [configError])
 
   const handleTest = async (slot: number) => {
-    setTests((prev) => ({ ...prev, [slot]: { loading: true } }))
-    try {
-      const result = await testNetworkPrinterConnection(slot)
-      setTests((prev) => ({ ...prev, [slot]: { loading: false, result } }))
-      setPrinters((prev) =>
-        prev.map((p) =>
-          p.slot === slot
-            ? {
-                ...p,
-                last_connection_ok: result.ok,
-                last_connection_category: result.category,
-                last_connection_message: result.message,
-                last_connection_http_status: result.http_status,
-                last_connection_latency_ms: result.latency_ms,
-                last_checked_at: result.checked_at,
-                password_configured: result.password_configured,
-              }
-            : p,
-        ),
-      )
-    } catch (err) {
-      setTests((prev) => ({
-        ...prev,
-        [slot]: {
-          loading: false,
-          error: err instanceof Error ? err.message : 'Connection test failed.',
-        },
-      }))
+    const ok = await checkSlot(slot)
+    if (!ok) {
+      const name = printers.find((p) => p.slot === slot)?.name || `Printer ${slot}`
+      reportOperationFailures([{ slot, name }])
     }
   }
 
-  const handleSaveName = async (slot: number) => {
-    const name = (draftNames[slot] || '').trim()
-    if (!name) return
-    setSavingSlot(slot)
-    try {
-      const updated = await updateNetworkPrinter(slot, { name })
-      setPrinters((prev) => prev.map((p) => (p.slot === slot ? updated : p)))
-    } catch {
-      setError('Could not save printer name.')
-    } finally {
-      setSavingSlot(null)
-    }
-  }
+  const handleSaveName = useCallback(
+    async (slot: number) => {
+      const name = (draftNames[slot] || '').trim()
+      if (!name) return
+      setSavingSlot(slot)
+      try {
+        await updateNetworkPrinter(slot, { name })
+        await reloadPrinterNames()
+      } catch {
+        setError('Could not save printer name.')
+      } finally {
+        setSavingSlot(null)
+      }
+    },
+    [draftNames, reloadPrinterNames],
+  )
 
   return (
     <AppLayout>
-      <main className="mx-auto max-w-[1400px] space-y-6 px-4 py-6 sm:px-6">
-        <div className="flex items-start justify-between gap-4">
+      <main className="ui-page">
+        <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">
-              Connect to Printer
-            </h1>
-            <p className="mt-1 max-w-3xl text-sm text-slate-500">
-              Test that each printer is reachable on the office network. Passwords stay on the
-              server and are never shown in the browser.
+            <div className="ui-section-label mb-1">Configuration</div>
+            <h1 className="ui-page-title">Connect to Printer</h1>
+            <p className="ui-page-subtitle">
+              Status reflects the latest live reachability check (auto-refreshed about every 30
+              seconds). Passwords stay on the server and are never shown in the browser.
             </p>
           </div>
           <button
             type="button"
-            onClick={() => void refresh()}
-            className="inline-flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50"
+            onClick={() => void refreshConfigs()}
+            className="ui-btn-secondary"
           >
             <RefreshCw size={16} />
             Refresh
           </button>
         </div>
 
-        {error && (
-          <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-            {error}
-          </div>
-        )}
+        {error && <div className="ui-alert-error">{error}</div>}
 
-        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+        <div className="ui-alert-warn">
           <div className="font-medium">Admin / IT only</div>
           <div className="mt-1">
             Printer passwords are configured on the server. If a connection fails, ask IT to
@@ -123,31 +97,29 @@ export function PrinterConfigPage() {
           </div>
         </div>
 
-        {loading ? (
-          <p className="text-slate-500">Loading printer configuration…</p>
+        {loadingConfigs && printers.length === 0 ? (
+          <div className="flex items-center gap-2 text-sm text-slate-500">
+            <Loader2 className="animate-spin text-blue-700" size={16} />
+            Loading printer configuration…
+          </div>
         ) : (
           <div className="grid gap-4 lg:grid-cols-3">
             {printers.map((printer) => {
-              const test = tests[printer.slot]
-              const statusOk = test?.result?.ok ?? printer.last_connection_ok
+              const status = live[printer.slot]
+              const phase = status?.phase ?? 'checking'
               const statusMsg =
-                test?.result?.message ??
-                test?.error ??
-                printer.last_connection_message
-              const checkedAt = test?.result?.checked_at ?? printer.last_checked_at
+                status?.result?.message ?? status?.error ?? printer.last_connection_message
+              const checkedAt = status?.checkedAt ?? status?.result?.checked_at
 
               return (
-                <div
-                  key={printer.slot}
-                  className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm"
-                >
+                <div key={printer.slot} className="ui-card-static flex flex-col">
                   <div className="mb-3 flex items-start justify-between gap-2">
-                    <div>
-                      <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                         Printer {printer.slot}
                       </div>
                       <input
-                        className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm font-semibold text-slate-900"
+                        className="ui-input mt-1 font-semibold"
                         value={draftNames[printer.slot] ?? printer.name}
                         onChange={(e) =>
                           setDraftNames((prev) => ({
@@ -160,9 +132,9 @@ export function PrinterConfigPage() {
                       />
                     </div>
                     <span
-                      className={`rounded border px-2 py-0.5 text-xs font-medium ${
+                      className={`shrink-0 rounded-md border px-2 py-0.5 text-xs font-medium ${
                         printer.protocol === 'https'
-                          ? 'border-sky-200 bg-sky-50 text-sky-800'
+                          ? 'border-blue-200 bg-blue-50 text-blue-800'
                           : 'border-slate-200 bg-slate-50 text-slate-700'
                       }`}
                     >
@@ -170,59 +142,55 @@ export function PrinterConfigPage() {
                     </span>
                   </div>
 
-                  <dl className="space-y-2 text-sm">
-                    <Row label="Address" value={printer.display_endpoint} mono />
-                    <Row
-                      label="Password"
-                      value={printer.password_configured ? 'Configured' : 'Not configured — ask IT'}
-                    />
-                    {printer.protocol === 'https' && (
-                      <Row label="Secure connection" value="Yes (office network)" />
+                  <div className="mb-1 flex items-center gap-2 text-sm">
+                    {phase === 'checking' ? (
+                      <>
+                        <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-sky-500" />
+                        <span className="font-medium text-sky-800">Checking…</span>
+                      </>
+                    ) : phase === 'connected' ? (
+                      <>
+                        <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
+                        <span className="font-medium text-green-800">Connected</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="inline-block h-2 w-2 rounded-full bg-red-500" />
+                        <span className="font-medium text-red-800">Disconnected</span>
+                      </>
                     )}
-                    {printer.protocol === 'http' && (
-                      <Row label="Secure connection" value="Standard (office network)" />
-                    )}
-                  </dl>
+                  </div>
 
-                  <div className="mt-4 border-t border-slate-100 pt-4">
+                  <p className="mb-3 min-h-[2.5rem] text-xs text-slate-500">
+                    {phase === 'checking'
+                      ? 'Live reachability check in progress…'
+                      : statusMsg ||
+                        (phase === 'connected'
+                          ? 'Printer responded successfully.'
+                          : 'Unable to reach the printer.')}
+                  </p>
+
+                  <div className="mt-auto space-y-2 border-t border-slate-100 pt-3 text-xs text-slate-500">
+                    <div>
+                      Endpoint:{' '}
+                      <span className="font-mono text-slate-700">{printer.display_endpoint}</span>
+                    </div>
+                    <div>Last checked: {checkedAt ? new Date(checkedAt).toLocaleTimeString() : '—'}</div>
                     <button
                       type="button"
-                      disabled={!!test?.loading}
-                      onClick={() => void handleTest(printer.slot)}
-                      className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-slate-800 px-3 py-2.5 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
+                      className="ui-btn-primary w-full"
+                      onClick={() => handleTest(printer.slot)}
+                      disabled={phase === 'checking'}
                     >
-                      {test?.loading ? (
+                      {phase === 'checking' ? (
                         <>
                           <Loader2 className="animate-spin" size={16} />
-                          Testing…
+                          Checking…
                         </>
                       ) : (
                         'Test Connection'
                       )}
                     </button>
-
-                    <div className="mt-3 min-h-[3.5rem]">
-                      {statusOk === true && (
-                        <StatusLine
-                          ok
-                          message={statusMsg || 'Connected'}
-                          meta={formatMeta(test?.result ?? null, checkedAt, printer)}
-                        />
-                      )}
-                      {statusOk === false && (
-                        <StatusLine
-                          ok={false}
-                          message={statusMsg || 'Connection failed'}
-                          meta={formatMeta(test?.result ?? null, checkedAt, printer)}
-                        />
-                      )}
-                      {statusOk == null && !test?.loading && !test?.error && (
-                        <p className="text-sm text-slate-500">Not tested yet.</p>
-                      )}
-                      {test?.error && statusOk == null && (
-                        <StatusLine ok={false} message={test.error} meta="" />
-                      )}
-                    </div>
                   </div>
                 </div>
               )
@@ -232,78 +200,4 @@ export function PrinterConfigPage() {
       </main>
     </AppLayout>
   )
-}
-
-function Row({
-  label,
-  value,
-  mono,
-}: {
-  label: string
-  value: string
-  mono?: boolean
-}) {
-  return (
-    <div className="flex items-start justify-between gap-3">
-      <dt className="shrink-0 text-slate-500">{label}</dt>
-      <dd
-        className={`text-right text-slate-900 break-all ${mono ? 'font-mono text-xs' : ''}`}
-      >
-        {value}
-      </dd>
-    </div>
-  )
-}
-
-function StatusLine({
-  ok,
-  message,
-  meta,
-}: {
-  ok: boolean
-  message: string
-  meta: string
-}) {
-  return (
-    <div
-      className={`rounded-md border px-3 py-2 text-sm ${
-        ok
-          ? 'border-green-200 bg-green-50 text-green-900'
-          : 'border-red-200 bg-red-50 text-red-900'
-      }`}
-    >
-      <div className="flex items-start gap-2 font-medium">
-        {ok ? (
-          <CheckCircle2 size={16} className="mt-0.5 shrink-0" />
-        ) : (
-          <XCircle size={16} className="mt-0.5 shrink-0" />
-        )}
-        <span>{ok ? 'Connected' : message}</span>
-      </div>
-      {(meta || (ok && message && message !== 'Connected')) && (
-        <div className="mt-0.5 pl-6 text-xs opacity-90">
-          {ok && message && message !== 'Connected' ? <div>{message}</div> : null}
-          {meta ? <div>{meta}</div> : null}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function formatMeta(
-  result: ConnectionTestResult | null,
-  checkedAt: string | null | undefined,
-  printer: NetworkPrinterConfig,
-): string {
-  const parts: string[] = []
-  const latency = result?.latency_ms ?? printer.last_connection_latency_ms
-  if (latency != null) parts.push(`Response time ${latency} ms`)
-  if (checkedAt) {
-    try {
-      parts.push(`Checked ${new Date(checkedAt).toLocaleString()}`)
-    } catch {
-      parts.push(`Checked ${checkedAt}`)
-    }
-  }
-  return parts.join(' · ')
 }

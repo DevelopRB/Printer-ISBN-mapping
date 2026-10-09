@@ -77,15 +77,15 @@ def test_multi_printer_separate_sheets():
     assert wb["Printer 3 ISBNs"].cell(2, 1).value == "9789372259803"
     # Reconciliation uses combined presence across printers
     recon = wb["Reconciliation"]
-    assert recon.cell(1, 4).value == "Printer"
-    assert recon.cell(1, 5).value == "Status"
-    assert recon.cell(2, 5).value == PRESENT  # 8888… from P1/P2
-    assert recon.cell(3, 5).value == PRESENT  # 1111… from P2
+    assert recon.cell(1, 10).value == "Printer"
+    assert recon.cell(1, 11).value == "Status"
+    assert recon.cell(2, 11).value == PRESENT  # 8888… from P1/P2
+    assert recon.cell(3, 11).value == PRESENT  # 1111… from P2
     # Print dates aggregated across printers for same ISBN
     assert "26-Aug-2026" in (recon.cell(2, 3).value or "")
     assert "27-Aug-2026" in (recon.cell(2, 3).value or "")
-    assert recon.cell(2, 4).value == "Printer 1, Printer 2"
-    assert recon.cell(3, 4).value == "Printer 2"
+    assert recon.cell(2, 10).value == "Printer 1, Printer 2"
+    assert recon.cell(3, 10).value == "Printer 2"
     skip = wb["Skipped ISBNs"]
     assert skip.cell(1, 1).value == "Printer"
     assert skip.cell(2, 1).value == "Printer 1"
@@ -112,9 +112,9 @@ def test_printer_preserves_duplicates_and_filenames():
     ws = _sheets(buf)["Printer ISBNs"]
     assert ws.cell(1, 1).value == "ISBN"
     assert ws.cell(1, 2).value == "Print Date"
-    assert ws.cell(1, 3).value == "Source Filename"
+    assert ws.cell(1, 11).value == "Source Filename"
     values = [
-        (ws.cell(r, 1).value, ws.cell(r, 2).value, ws.cell(r, 3).value)
+        (ws.cell(r, 1).value, ws.cell(r, 2).value, ws.cell(r, 11).value)
         for r in range(2, ws.max_row + 1)
     ]
     assert values == [
@@ -146,18 +146,17 @@ def test_reconciliation_preserves_list_a_duplicates():
             ws.cell(r, 1).value,
             ws.cell(r, 2).value or "",
             ws.cell(r, 3).value or "",
-            ws.cell(r, 4).value or "",
-            ws.cell(r, 5).value,
+            ws.cell(r, 11).value,
         )
         for r in range(2, ws.max_row + 1)
     ]
     # Same count/order as List A; printer duplicates do not add extra reconciliation rows
     assert rows == [
-        ("8888001171897", "8888001171897", "26-Aug-2026, 27-Aug-2026", "", PRESENT),
-        ("8888001171897", "8888001171897", "26-Aug-2026, 27-Aug-2026", "", PRESENT),
-        ("1111012883952", "1111012883952", "26-Aug-2026", "", PRESENT),
-        ("9789372259803", "9789372259803", "26-Aug-2026", "", PRESENT),
-        ("9789375480896", "", "", "", NOT_FOUND),
+        ("8888001171897", "8888001171897", "26-Aug-2026, 27-Aug-2026", PRESENT),
+        ("8888001171897", "8888001171897", "26-Aug-2026, 27-Aug-2026", PRESENT),
+        ("1111012883952", "1111012883952", "26-Aug-2026", PRESENT),
+        ("9789372259803", "9789372259803", "26-Aug-2026", PRESENT),
+        ("9789375480896", "", "", NOT_FOUND),
     ]
 
 
@@ -169,7 +168,7 @@ def test_printer_only_not_in_sheet3():
     ws = _sheets(buf)["Reconciliation"]
     assert ws.max_row == 2  # header + 1 data row
     assert ws.cell(2, 1).value == "8888001171897"
-    assert ws.cell(2, 5).value == PRESENT
+    assert ws.cell(2, 11).value == PRESENT
 
 
 def test_business_identifier_not_converted():
@@ -180,7 +179,7 @@ def test_business_identifier_not_converted():
     ws = _sheets(buf)["Reconciliation"]
     assert ws.cell(2, 1).value == "8888000240648"
     assert ws.cell(2, 2).value == "8888000240648"
-    assert ws.cell(2, 5).value == PRESENT
+    assert ws.cell(2, 11).value == PRESENT
     assert not str(ws.cell(2, 1).value).startswith("978888")
 
 

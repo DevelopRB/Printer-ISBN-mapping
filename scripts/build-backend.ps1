@@ -17,6 +17,14 @@ if (-not (Test-Path $VenvPython)) {
 & $VenvPython -m pip install -q "pyinstaller>=6.0"
 if ($LASTEXITCODE -ne 0) { throw "Failed to install PyInstaller" }
 
+# Clean previous outputs — incomplete _internal (missing base_library.zip) causes:
+# "Failed to start embedded python interpreter!"
+if (Test-Path $OutDir) {
+  Remove-Item $OutDir -Recurse -Force
+}
+if (Test-Path $WorkDir) {
+  Remove-Item $WorkDir -Recurse -Force
+}
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 New-Item -ItemType Directory -Force -Path $WorkDir | Out-Null
 New-Item -ItemType Directory -Force -Path $SpecDir | Out-Null
@@ -35,16 +43,20 @@ if (Test-Path $ProjectEnv) {
 
 Push-Location $Backend
 try {
+  # --noupx: UPX-packed DLLs often fail on corporate PCs / Defender.
+  # --console: false via --noconsole; keep windowless for Operations.
   & $VenvPython -m PyInstaller `
     --noconfirm `
     --clean `
     --name "PrintingReconciliationAPI" `
     --onedir `
     --noconsole `
+    --noupx `
     --distpath $OutDir `
     --workpath $WorkDir `
     --specpath $SpecDir `
     --paths $Backend `
+    --contents-directory "_internal" `
     --hidden-import uvicorn.logging `
     --hidden-import uvicorn.loops `
     --hidden-import uvicorn.loops.auto `
@@ -87,10 +99,21 @@ try {
   }
 
   $Exe = Join-Path $OutDir "PrintingReconciliationAPI.exe"
+  $BaseZip = Join-Path $OutDir "_internal\base_library.zip"
+  $PyDll = Join-Path $OutDir "_internal\python312.dll"
   if (-not (Test-Path $Exe)) {
     throw "Expected $Exe was not produced"
   }
+  if (-not (Test-Path $PyDll)) {
+    throw "Missing python312.dll in _internal - backend bundle is incomplete"
+  }
+  if (-not (Test-Path $BaseZip)) {
+    throw "Missing base_library.zip in _internal - backend will fail with: Failed to start embedded python interpreter! Delete release\pyinstaller-work and retry."
+  }
+
+  $zipSize = (Get-Item $BaseZip).Length
   Write-Host "Backend OK: $Exe"
+  Write-Host "  python312.dll + base_library.zip ($zipSize bytes) present"
 }
 finally {
   Pop-Location

@@ -194,8 +194,16 @@ function startBackend(port, envPaths) {
 
   const logFile = path.join(envPaths.logsDir, 'electron-backend.log')
   const logStream = fs.createWriteStream(logFile, { flags: 'a' })
+  logStream.write(
+    `\n[${new Date().toISOString()}] starting backend\n` +
+      `command=${command}\n` +
+      `cwd=${cwd}\nexists=${fs.existsSync(command)}\n`,
+  )
   backendProcess.stdout?.on('data', (d) => logStream.write(d))
   backendProcess.stderr?.on('data', (d) => logStream.write(d))
+  backendProcess.on('error', (err) => {
+    logStream.write(`[spawn error] ${err.message}\n`)
+  })
   backendProcess.on('exit', (code, signal) => {
     logStream.write(`\n[exit] code=${code} signal=${signal}\n`)
     logStream.end()

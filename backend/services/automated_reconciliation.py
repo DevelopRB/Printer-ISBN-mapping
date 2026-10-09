@@ -109,14 +109,24 @@ def _set_step(db: Session, run: AutomatedRun, key: str, status: str, detail: str
 def create_run(
     db: Session,
     *,
-    list_a_upload_id: int,
+    list_a_upload_id: int | None,
     printer_slots: list[int],
     start_date: str,
     end_date: str,
 ) -> AutomatedRun:
-    upload = db.query(Upload).filter(Upload.id == list_a_upload_id, Upload.upload_type == "list_a").first()
-    if not upload:
-        raise ValueError("List A upload not found.")
+    """Start an automated run.
+
+    List A is optional: without it the run still downloads printer data and supports
+    ISBN search; reconciliation / List A export sheets stay empty until List A is used.
+    """
+    if list_a_upload_id is not None:
+        upload = (
+            db.query(Upload)
+            .filter(Upload.id == list_a_upload_id, Upload.upload_type == "list_a")
+            .first()
+        )
+        if not upload:
+            raise ValueError("List A upload not found.")
 
     start = _parse_date(start_date)
     end = _parse_date(end_date)
@@ -177,21 +187,31 @@ def _execute_run_body(db: Session, run: AutomatedRun) -> None:
     start = _parse_date(run.start_date)
     end = _parse_date(run.end_date)
 
-    # 1) List A
+    # 1) List A (optional — ISBN search works from printer data alone)
     _set_step(db, run, "prepare_list_a", "running")
-    list_a = (
-        db.query(ListARecord).filter(ListARecord.upload_id == run.list_a_upload_id).all()
-    )
-    if not list_a:
-        raise ValueError("List A has no records.")
-    upload = db.query(Upload).filter(Upload.id == run.list_a_upload_id).first()
-    _set_step(
-        db,
-        run,
-        "prepare_list_a",
-        "done",
-        f"{len(list_a)} records · {upload.isbn_detected_count if upload else 0} ISBNs",
-    )
+    list_a: list[ListARecord] = []
+    if run.list_a_upload_id is not None:
+        list_a = (
+            db.query(ListARecord).filter(ListARecord.upload_id == run.list_a_upload_id).all()
+        )
+        if not list_a:
+            raise ValueError("List A has no records.")
+        upload = db.query(Upload).filter(Upload.id == run.list_a_upload_id).first()
+        _set_step(
+            db,
+            run,
+            "prepare_list_a",
+            "done",
+            f"{len(list_a)} records · {upload.isbn_detected_count if upload else 0} ISBNs",
+        )
+    else:
+        _set_step(
+            db,
+            run,
+            "prepare_list_a",
+            "done",
+            "Skipped — no List A (printer search only)",
+        )
 
     configs = {c.slot: c for c in ensure_network_printer_configs(db)}
     printer_ok = 0
@@ -282,6 +302,12 @@ def _execute_run_body(db: Session, run: AutomatedRun) -> None:
                     raw_payload["_original_filename"] = filename
                     raw_payload["_job_id"] = rec.job_no
                     raw_payload["_print_date"] = rec.printer_date
+                    raw_payload["_job_end"] = rec.job_end
+                    raw_payload["_print_start"] = rec.print_start
+                    raw_payload["_job_accept"] = rec.job_accept
+                    raw_payload["_result"] = rec.result
+                    raw_payload["_set_number"] = rec.set_number
+                    raw_payload["_output_set"] = rec.output_set
                     row = AutomatedPrinterRecord(
                         run_id=run.id,
                         download_id=download.id,

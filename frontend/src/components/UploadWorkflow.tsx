@@ -30,16 +30,16 @@ export function UploadWorkflow({
   const canReconcile = Boolean(listA) && printers.some((p) => printerUploadById.has(p.id))
 
   return (
-    <div className="space-y-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="ui-card-static space-y-6">
       <div>
         <h2 className="text-base font-semibold text-slate-900">Upload Workflow</h2>
         <p className="mt-1 text-sm text-slate-500">
-          List A is the source of truth. Printer files are production records — only ISBNs are
-          extracted for matching.
+          List A (books that were given to the printer for printing) is the source of truth.
+          Printer files are production records — only ISBNs are extracted for matching.
         </p>
       </div>
 
-      <Step title="Step 1 — Upload List A">
+      <Step title="Step 1 — Upload List A (books that were given to the printer for printing)">
         <FilePicker
           label="Choose Excel / CSV"
           accept=".xlsx,.xls,.csv"
@@ -65,7 +65,7 @@ export function UploadWorkflow({
             const up = printerUploadById.get(p.id)
             const label = manualPrinterLabel(p.slot)
             return (
-              <div key={p.id} className="rounded-md border border-slate-200 p-3">
+              <div key={p.id} className="rounded-lg border border-slate-200 bg-slate-50/50 p-3">
                 <div className="mb-2 text-sm font-medium text-slate-800">{label}</div>
                 <FilePicker
                   label="Choose Excel File"
@@ -95,7 +95,7 @@ export function UploadWorkflow({
           type="button"
           disabled={!canReconcile || busy}
           onClick={() => void onReconcile()}
-          className="inline-flex items-center gap-2 rounded-md bg-slate-800 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+          className="ui-btn-primary"
         >
           {busy ? <Loader2 className="animate-spin" size={16} /> : <FileSpreadsheet size={16} />}
           Run Reconciliation
@@ -107,11 +107,7 @@ export function UploadWorkflow({
         )}
       </Step>
 
-      {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-          {error}
-        </div>
-      )}
+      {error && <div className="ui-alert-error">{error}</div>}
     </div>
   )
 }
@@ -163,7 +159,7 @@ function FilePicker({
         type="button"
         disabled={disabled || localBusy}
         onClick={() => ref.current?.click()}
-        className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+        className="ui-btn-secondary"
       >
         {localBusy ? <Loader2 className="animate-spin" size={16} /> : <Upload size={16} />}
         {localBusy ? 'Uploading…' : label}

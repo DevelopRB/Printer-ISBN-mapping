@@ -19,8 +19,17 @@ from api.schemas import (
     AutomatedRunCreate,
     AutomatedRunOut,
     AutomatedResultOut,
+    DirectBatchItemOut,
+    DirectIsbnSearchCreate,
+    DirectIsbnSearchOut,
+    DirectMultiIsbnSearchCreate,
+    DirectMultiIsbnSearchOut,
+    DirectSearchPrinterStatusOut,
     PaginatedAutomatedResults,
     PrinterDownloadOut,
+    PrinterSearchOccurrenceOut,
+    RunSearchDataOut,
+    SearchResultsExportCreate,
 )
 from database import UPLOADS_DIR, get_db
 from logging_config import logger
@@ -34,9 +43,12 @@ from models.models import (
     Upload,
 )
 from services.automated_reconciliation import create_run, execute_run
+from services.direct_isbn_search import direct_search_isbn, direct_search_isbns
 from services.excel_parser import ColumnDetectionError
 from services.normalized_export import export_normalized_for_run, normalized_export_filename
 from services.normalizer import normalize_list_a
+from services.search_results_export import build_search_results_excel
+
 router = APIRouter(prefix="/reconciliation", tags=["automated-reconciliation"])
 
 
@@ -51,7 +63,9 @@ def _parse_json_list(value: str | None) -> list:
 
 
 def _run_out(run: AutomatedRun, db: Session) -> AutomatedRunOut:
-    uploads = db.query(Upload).filter(Upload.id == run.list_a_upload_id).first()
+    uploads = None
+    if run.list_a_upload_id is not None:
+        uploads = db.query(Upload).filter(Upload.id == run.list_a_upload_id).first()
     downloads = (
         db.query(PrinterDownload)
         .filter(PrinterDownload.run_id == run.id)
@@ -330,6 +344,279 @@ def get_printer_records_view(
         for r in rows
     ]
     return PaginatedAutomatedResults(total=total, page=page, page_size=page_size, items=items)
+
+
+@router.get("/run/{run_id}/search-data", response_model=RunSearchDataOut)
+def get_run_search_data(run_id: int, db: Session = Depends(get_db)):
+    """Return List A ISBNs + all printer occurrences for in-app ISBN search.
+
+    Printer occurrences are built from the SAME classify_run_downloads() path used by
+    normalized Excel export (Sheet 2). Falls back to AutomatedPrinterRecord rows only
+    when stored TSV is unavailable. Does not re-fetch printers or invent a second
+    extraction/normalization algorithm.
+    """
+    run = db.query(AutomatedRun).filter(AutomatedRun.id == run_id).first()
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found.")
+    if run.status not in ("COMPLETED", "PARTIAL_SUCCESS"):
+        raise HTTPException(
+            status_code=409,
+            detail="Search data is available only after a run completes.",
+        )
+
+    list_a_rows = []
+    if run.list_a_upload_id is not None:
+        list_a_rows = (
+            db.query(ListARecord.isbn_normalized)
+            .filter(
+                ListARecord.upload_id == run.list_a_upload_id,
+                ListARecord.isbn_normalized.isnot(None),
+                ListARecord.isbn_normalized != "",
+            )
+            .all()
+        )
+    list_a_isbns = sorted({str(r[0]) for r in list_a_rows if r[0]})
+
+    printer_occurrences: list[PrinterSearchOccurrenceOut] = []
+
+    from services.normalized_export import classify_run_downloads
+
+    classified = classify_run_downloads(db, run_id)
+    if classified is not None:
+        # Same traces as Excel Printer ISBNs sheet — preserve every occurrence.
+        for t in classified.extracted:
+            isbn = str(t.normalized_identifier or "").strip()
+            if not isbn:
+                continue
+            printer_occurrences.append(
+                PrinterSearchOccurrenceOut(
+                    isbn=isbn,
+                    print_date=t.print_date,
+                    printer_name=t.printer_name or (
+                        f"Printer {t.printer_slot}" if t.printer_slot else "Printer"
+                    ),
+                    printer_slot=int(t.printer_slot or 0),
+                    source_filename=t.document_filename or t.raw_4010_value,
+                    source_row=t.source_row,
+                    job_id=t.job_id,
+                    job_end=t.job_end,
+                    print_start=t.print_start,
+                    job_accept=t.job_accept,
+                    result=t.result,
+                    set_number=t.set_number,
+                    output_set=t.output_set,
+                )
+            )
+        logger.info(
+            "Search-data run=%s source=TSV occurrences=%s list_a=%s",
+            run_id,
+            len(printer_occurrences),
+            len(list_a_isbns),
+        )
+    else:
+        # Fallback: DB rows written during the same run ingest (same extract_isbn).
+        printer_rows = (
+            db.query(AutomatedPrinterRecord)
+            .filter(
+                AutomatedPrinterRecord.run_id == run_id,
+                AutomatedPrinterRecord.isbn_normalized.isnot(None),
+                AutomatedPrinterRecord.isbn_normalized != "",
+            )
+            .order_by(AutomatedPrinterRecord.id)
+            .all()
+        )
+        for r in printer_rows:
+            job_fields = {}
+            job_id = None
+            if r.raw_json:
+                try:
+                    raw = json.loads(r.raw_json)
+                except (json.JSONDecodeError, TypeError):
+                    raw = {}
+                from printers.joblog_adapter import compose_job_fields_from_raw
+
+                job_fields = compose_job_fields_from_raw(raw if isinstance(raw, dict) else {})
+                job_id = raw.get("_job_id") or raw.get("1122")
+                job_id = str(job_id) if job_id not in (None, "") else None
+            printer_occurrences.append(
+                PrinterSearchOccurrenceOut(
+                    isbn=str(r.isbn_normalized),
+                    print_date=r.printer_date,
+                    printer_name=r.printer_name,
+                    printer_slot=r.printer_slot,
+                    source_filename=r.source_filename,
+                    source_row=r.source_row,
+                    job_id=job_id,
+                    job_end=job_fields.get("job_end"),
+                    print_start=job_fields.get("print_start"),
+                    job_accept=job_fields.get("job_accept"),
+                    result=job_fields.get("result"),
+                    set_number=job_fields.get("set_number"),
+                    output_set=job_fields.get("output_set"),
+                )
+            )
+        logger.warning(
+            "Search-data run=%s source=DB_FALLBACK occurrences=%s (TSV unavailable)",
+            run_id,
+            len(printer_occurrences),
+        )
+
+    return RunSearchDataOut(
+        run_id=run.id,
+        start_date=run.start_date,
+        end_date=run.end_date,
+        list_a_isbns=list_a_isbns,
+        printer_occurrences=printer_occurrences,
+    )
+
+
+@router.post("/search-isbn", response_model=DirectIsbnSearchOut)
+def search_isbn_direct(payload: DirectIsbnSearchCreate, db: Session = Depends(get_db)):
+    """Fetch printer records for the selected date range and search one ISBN.
+
+    Reuses the same JobLog download/parse + extract_isbn path as automated runs.
+    Does not create an AutomatedRun, reconciliation rows, or Excel export.
+    """
+    try:
+        result = direct_search_isbn(
+            db,
+            isbn=payload.isbn,
+            printer_slots=payload.printer_ids,
+            start_date=payload.start_date,
+            end_date=payload.end_date,
+            list_a_upload_id=payload.list_a_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return DirectIsbnSearchOut(
+        query=result.query,
+        normalized_isbn=result.normalized_isbn,
+        start_date=result.start_date,
+        end_date=result.end_date,
+        list_a=result.list_a,
+        printer=result.printer,
+        status=result.status,
+        occurrences=[
+            PrinterSearchOccurrenceOut(
+                isbn=o.isbn,
+                print_date=o.print_date,
+                printer_name=o.printer_name,
+                printer_slot=o.printer_slot,
+                source_filename=o.source_filename,
+                source_row=o.source_row,
+                job_id=o.job_id,
+                job_end=o.job_end,
+                print_start=o.print_start,
+                job_accept=o.job_accept,
+                result=o.result,
+                set_number=o.set_number,
+                output_set=o.output_set,
+            )
+            for o in result.occurrences
+        ],
+        printers=[
+            DirectSearchPrinterStatusOut(
+                slot=p.slot,
+                name=p.name,
+                ok=p.ok,
+                record_count=p.record_count,
+                match_count=p.match_count,
+                error=p.error,
+            )
+            for p in result.printers
+        ],
+        steps=result.steps,
+    )
+
+
+def _occurrence_out(o) -> PrinterSearchOccurrenceOut:
+    return PrinterSearchOccurrenceOut(
+        isbn=o.isbn,
+        print_date=o.print_date,
+        printer_name=o.printer_name,
+        printer_slot=o.printer_slot,
+        source_filename=o.source_filename,
+        source_row=o.source_row,
+        job_id=o.job_id,
+        job_end=o.job_end,
+        print_start=o.print_start,
+        job_accept=o.job_accept,
+        result=o.result,
+        set_number=o.set_number,
+        output_set=o.output_set,
+    )
+
+
+@router.post("/search-isbns", response_model=DirectMultiIsbnSearchOut)
+def search_isbns_direct(payload: DirectMultiIsbnSearchCreate, db: Session = Depends(get_db)):
+    """Fetch printer records once per printer, then search many ISBNs.
+
+    Same JobLog download/parse + extract_isbn path as single search / automated runs.
+    Does not create an AutomatedRun, reconciliation rows, or Excel export.
+    """
+    try:
+        result = direct_search_isbns(
+            db,
+            isbns=payload.isbns,
+            printer_slots=payload.printer_ids,
+            start_date=payload.start_date,
+            end_date=payload.end_date,
+            list_a_upload_id=payload.list_a_id,
+            entered_count=payload.entered_count,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return DirectMultiIsbnSearchOut(
+        start_date=result.start_date,
+        end_date=result.end_date,
+        entered_count=result.entered_count,
+        unique_count=result.unique_count,
+        found_count=result.found_count,
+        not_found_count=result.not_found_count,
+        connection_issue_count=result.connection_issue_count,
+        results=[
+            DirectBatchItemOut(
+                query=item.query,
+                normalized_isbn=item.normalized_isbn,
+                list_a=item.list_a,
+                printer=item.printer,
+                status=item.status,
+                occurrences=[_occurrence_out(o) for o in item.occurrences],
+            )
+            for item in result.results
+        ],
+        printers=[
+            DirectSearchPrinterStatusOut(
+                slot=p.slot,
+                name=p.name,
+                ok=p.ok,
+                record_count=p.record_count,
+                match_count=p.match_count,
+                error=p.error,
+            )
+            for p in result.printers
+        ],
+        steps=result.steps,
+    )
+
+
+@router.post("/search-results/export")
+def export_search_results(payload: SearchResultsExportCreate):
+    """Export already-displayed ISBN Search Results to Excel.
+
+    Does not fetch printers or re-run search. Print Date is taken from each
+    supplied row (same field the Search Results UI uses: print_date).
+    """
+    rows = [r.model_dump() for r in payload.rows]
+    data = build_search_results_excel(rows)
+    filename = "ISBN_Search_Results.xlsx"
+    return StreamingResponse(
+        BytesIO(data),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.post("/run/{run_id}/retry-failed", response_model=AutomatedRunOut)

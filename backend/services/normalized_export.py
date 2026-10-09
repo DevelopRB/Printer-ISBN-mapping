@@ -67,7 +67,74 @@ class PrinterIsbnTrace:
     job_id: str | None = None
     printer_slot: int | None = None
     printer_name: str | None = None
+    job_end: str | None = None
+    print_start: str | None = None
+    job_accept: str | None = None
+    result: str | None = None
+    set_number: str | None = None
+    output_set: str | None = None
 
+
+# Sheet 2 / printer ISBN sheet columns (one row = one printer job occurrence).
+PRINTER_ISBN_HEADERS = [
+    "ISBN",
+    "Print Date",
+    "Job End",
+    "Print Start",
+    "Job Accept",
+    "Result",
+    "Set Number (total quantity)",
+    "Output Set (Printed quantity)",
+    "Printer",
+    "Job ID",
+    "Source Filename",
+]
+
+# Sheet 3 Reconciliation columns (one row per List A ISBN; multi-job fields joined).
+# Job ID and Source Filename stay on Sheet 2 only.
+RECONCILIATION_HEADERS = [
+    "List A ISBN",
+    "Printer ISBN",
+    "Print Date",
+    "Job End",
+    "Print Start",
+    "Job Accept",
+    "Result",
+    "Set Number (total quantity)",
+    "Output Set (Printed quantity)",
+    "Printer",
+    "Status",
+]
+
+
+@dataclass(frozen=True)
+class PrinterSheetRow:
+    """One Sheet 2 row — all fields from the same printer job."""
+
+    isbn: str
+    print_date: str = ""
+    job_end: str = ""
+    print_start: str = ""
+    job_accept: str = ""
+    result: str = ""
+    set_number: str = ""
+    output_set: str = ""
+    printer: str = ""
+    job_id: str = ""
+    source_filename: str = ""
+
+
+def join_occurrence_values(values: list[str | None], *, as_dates: bool = False) -> str:
+    """Join all occurrence values in source order (keep duplicates; do not sum)."""
+    out: list[str] = []
+    for raw in values:
+        text = (raw or "").strip()
+        if as_dates:
+            text = format_ops_date(text) if text else ""
+        out.append(text)
+    # Drop trailing empties only if entire list empty? Keep parallel fidelity: join non-empty.
+    nonempty = [v for v in out if v]
+    return ", ".join(nonempty)
 
 @dataclass(frozen=True)
 class SkippedPrinterTrace:
@@ -208,24 +275,39 @@ def classify_4010_values(
     source_label: str = "tsv",
     print_dates: list[str | None] | None = None,
     job_ids: list[str | None] | None = None,
+    job_ends: list[str | None] | None = None,
+    print_starts: list[str | None] | None = None,
+    job_accepts: list[str | None] | None = None,
+    results: list[str | None] | None = None,
+    set_numbers: list[str | None] | None = None,
+    output_sets: list[str | None] | None = None,
 ) -> PrinterClassifyResult:
     """Classify each raw printer 4010 into extracted ISBN(s) and/or skipped.
 
     Walks values in list order. Does not sort or dedupe.
-    When print_dates/job_ids are provided they MUST be same-length and
+    When parallel job-field lists are provided they MUST be same-length and
     correspond 1:1 with each raw_4010_values row (same printer job).
     """
     result = PrinterClassifyResult(raw_record_count=len(raw_4010_values))
     occurrence_index = 0
-    dates = list(print_dates) if print_dates is not None else [None] * len(raw_4010_values)
-    jobs = list(job_ids) if job_ids is not None else [None] * len(raw_4010_values)
-    if len(dates) != len(raw_4010_values) or len(jobs) != len(raw_4010_values):
-        raise ValueError("print_dates/job_ids must align 1:1 with printer job rows")
+    n = len(raw_4010_values)
+    dates = list(print_dates) if print_dates is not None else [None] * n
+    jobs = list(job_ids) if job_ids is not None else [None] * n
+    ends = list(job_ends) if job_ends is not None else [None] * n
+    starts = list(print_starts) if print_starts is not None else [None] * n
+    accepts = list(job_accepts) if job_accepts is not None else [None] * n
+    res_list = list(results) if results is not None else [None] * n
+    sets = list(set_numbers) if set_numbers is not None else [None] * n
+    outs = list(output_sets) if output_sets is not None else [None] * n
+    for parallel in (dates, jobs, ends, starts, accepts, res_list, sets, outs):
+        if len(parallel) != n:
+            raise ValueError("job field lists must align 1:1 with printer job rows")
 
     for row_idx, raw_4010 in enumerate(raw_4010_values, start=1):
         raw = (raw_4010 or "").strip()
-        row_date = dates[row_idx - 1]
-        row_job = jobs[row_idx - 1]
+        i = row_idx - 1
+        row_date = dates[i]
+        row_job = jobs[i]
         if not raw:
             result.skipped.append(
                 SkippedPrinterTrace(
@@ -263,6 +345,12 @@ def classify_4010_values(
                     document_filename=filename,
                     print_date=row_date,
                     job_id=str(row_job) if row_job is not None else None,
+                    job_end=ends[i],
+                    print_start=starts[i],
+                    job_accept=accepts[i],
+                    result=res_list[i],
+                    set_number=sets[i],
+                    output_set=outs[i],
                 )
             )
 
@@ -369,6 +457,9 @@ def classify_db_printer_records(
             occurrence_index += 1
             row_extracted += 1
             rec_id = getattr(rec, "id", None)
+            job_fields = _job_fields_from_raw_json(
+                getattr(rec, raw_json_attr, None) if raw_json_attr else None
+            )
             extracted.append(
                 PrinterIsbnTrace(
                     printer_record_id=str(rec_id) if rec_id is not None else f"row:{source_row}",
@@ -384,6 +475,12 @@ def classify_db_printer_records(
                     ),
                     printer_slot=slot,
                     printer_name=printer_name or (f"Printer {slot}" if slot else None),
+                    job_end=job_fields["job_end"],
+                    print_start=job_fields["print_start"],
+                    job_accept=job_fields["job_accept"],
+                    result=job_fields["result"],
+                    set_number=job_fields["set_number"],
+                    output_set=job_fields["output_set"],
                 )
             )
 
@@ -430,24 +527,49 @@ def _job_id_from_raw_json(raw_json: str | None) -> str | None:
         return None
 
 
+def _job_fields_from_raw_json(raw_json: str | None) -> dict[str, str | None]:
+    """Compose Job End / Print Start / … from stored raw_json (same printer row)."""
+    if not raw_json:
+        return {
+            "job_end": None,
+            "print_start": None,
+            "job_accept": None,
+            "result": None,
+            "set_number": None,
+            "output_set": None,
+        }
+    try:
+        data = json.loads(raw_json)
+    except (json.JSONDecodeError, TypeError):
+        data = {}
+    from printers.joblog_adapter import compose_job_fields_from_raw
+
+    return compose_job_fields_from_raw(data if isinstance(data, dict) else {})
+
+
 def classify_tsv_bytes(tsv_bytes: bytes, *, source_label: str = "tsv") -> PrinterClassifyResult:
     """Parse a printer TSV and classify into extracted + skipped.
 
-    Processes each job row individually so ISBN + Print Date + Filename stay linked.
-    Print Date comes from the same TSV row fields that feed the Convert CSV popup Date.
+    Processes each job row individually so ISBN + print job fields stay linked.
+    Print Date / Job End / Print Start / Job Accept / Result / Set Number / Output Set
+    come from the same TSV row as Filename.
     """
     from printers.joblog_adapter import JobLogCgiAdapter
 
     adapter = object.__new__(JobLogCgiAdapter)
     records, _meta = JobLogCgiAdapter._parse_tsv(adapter, tsv_bytes)
     raw_values = [(r.source_filename or "") for r in records]
-    print_dates = [r.printer_date for r in records]
-    job_ids = [r.job_no for r in records]
     return classify_4010_values(
         raw_values,
         source_label=source_label,
-        print_dates=print_dates,
-        job_ids=job_ids,
+        print_dates=[r.printer_date for r in records],
+        job_ids=[r.job_no for r in records],
+        job_ends=[r.job_end for r in records],
+        print_starts=[r.print_start for r in records],
+        job_accepts=[r.job_accept for r in records],
+        results=[r.result for r in records],
+        set_numbers=[r.set_number for r in records],
+        output_sets=[r.output_set for r in records],
     )
 
 
@@ -478,6 +600,12 @@ def _tag_classify_result(
                 job_id=t.job_id,
                 printer_slot=printer_slot,
                 printer_name=printer_name,
+                job_end=t.job_end,
+                print_start=t.print_start,
+                job_accept=t.job_accept,
+                result=t.result,
+                set_number=t.set_number,
+                output_set=t.output_set,
             )
         )
     for s in part.skipped:
@@ -558,7 +686,7 @@ def printer_isbns_from_run_downloads(db: Session, run_id: int) -> list[PrinterIs
 
 def build_normalized_workbook(
     list_a_isbns: list[str],
-    printer_rows: list[tuple[str, str, str]] | list[tuple[str, str]] | list[str] | None = None,
+    printer_rows: list | None = None,
     skipped_rows: list[tuple[int, str, str]] | None = None,
     printer_sheets: list[tuple[str, list]] | None = None,
 ) -> BytesIO:
@@ -567,31 +695,60 @@ def build_normalized_workbook(
     Sheet 1 — List A ISBNs: all List A occurrences in source order (no dedupe).
     Then one sheet per printer used in the run:
       Printer 1 ISBNs / Printer 2 ISBNs / Printer 3 ISBNs
-      Columns: ISBN | Print Date | Source Filename (duplicates + source order kept).
+      Columns: ISBN | Print Date | Job End | Print Start | Job Accept | Result |
+               Set Number (total quantity) | Output Set (Printed quantity) |
+               Printer | Job ID | Source Filename
     Then Reconciliation: one row per List A occurrence (duplicates kept).
-      Columns: List A ISBN | Printer ISBN | Print Date | Printer | Status
+      Multi-job fields joined comma-separated in occurrence order.
+      (Job ID and Source Filename are on printer sheets only.)
     Then Skipped ISBNs: raw printer records with no extractable ISBN.
 
     Pass either:
       - printer_sheets: [(sheet_title, rows), ...] preferred for multi-printer runs
       - printer_rows: flat list → single sheet titled "Printer ISBNs" (legacy/tests)
 
-    Row shape: (isbn, print_date, filename) or (isbn, print_date, filename, printer_label).
+    Row shape: PrinterSheetRow, dict, or legacy tuple
+      (isbn, print_date, filename) / (isbn, print_date, filename, printer_label).
     """
     import xlsxwriter
 
-    def _normalize_row(item) -> tuple[str, str, str, str]:
+    def _normalize_row(item) -> PrinterSheetRow:
+        if isinstance(item, PrinterSheetRow):
+            return item
+        if isinstance(item, dict):
+            return PrinterSheetRow(
+                isbn=str(item.get("isbn") or ""),
+                print_date=str(item.get("print_date") or ""),
+                job_end=str(item.get("job_end") or ""),
+                print_start=str(item.get("print_start") or ""),
+                job_accept=str(item.get("job_accept") or ""),
+                result=str(item.get("result") or ""),
+                set_number=str(item.get("set_number") or ""),
+                output_set=str(item.get("output_set") or ""),
+                printer=str(item.get("printer") or ""),
+                job_id=str(item.get("job_id") or ""),
+                source_filename=str(item.get("source_filename") or item.get("filename") or ""),
+            )
         if isinstance(item, tuple):
             if len(item) >= 4:
-                return (item[0] or "", item[1] or "", item[2] or "", item[3] or "")
+                return PrinterSheetRow(
+                    isbn=item[0] or "",
+                    print_date=item[1] or "",
+                    source_filename=item[2] or "",
+                    printer=item[3] or "",
+                )
             if len(item) >= 3:
-                return (item[0] or "", item[1] or "", item[2] or "", "")
+                return PrinterSheetRow(
+                    isbn=item[0] or "",
+                    print_date=item[1] or "",
+                    source_filename=item[2] or "",
+                )
             if len(item) == 2:
-                return (item[0] or "", "", item[1] or "", "")
-            return ((item[0] if item else "") or "", "", "", "")
-        return (item or "", "", "", "")
+                return PrinterSheetRow(isbn=item[0] or "", source_filename=item[1] or "")
+            return PrinterSheetRow(isbn=(item[0] if item else "") or "")
+        return PrinterSheetRow(isbn=item or "")
 
-    sheets: list[tuple[str, list[tuple[str, str, str, str]]]] = []
+    sheets: list[tuple[str, list[PrinterSheetRow]]] = []
     if printer_sheets:
         for title, rows in printer_sheets:
             sheets.append((title, [_normalize_row(r) for r in rows]))
@@ -600,22 +757,33 @@ def build_normalized_workbook(
 
     skipped_rows = list(skipped_rows or [])
 
-    all_printer_rows: list[tuple[str, str, str, str]] = []
+    all_printer_rows: list[PrinterSheetRow] = []
     for title, rows in sheets:
         sheet_label = printer_label_from_sheet_title(title)
-        for isbn, print_date, filename, row_printer in rows:
-            label = (row_printer or sheet_label or "").strip()
-            all_printer_rows.append((isbn, print_date, filename, label))
+        for row in rows:
+            label = (row.printer or sheet_label or "").strip()
+            if label and not row.printer:
+                row = PrinterSheetRow(
+                    isbn=row.isbn,
+                    print_date=row.print_date,
+                    job_end=row.job_end,
+                    print_start=row.print_start,
+                    job_accept=row.job_accept,
+                    result=row.result,
+                    set_number=row.set_number,
+                    output_set=row.output_set,
+                    printer=label,
+                    job_id=row.job_id,
+                    source_filename=row.source_filename,
+                )
+            all_printer_rows.append(row)
 
-    printer_set = {isbn for isbn, _d, _fn, _p in all_printer_rows if isbn}
-    dates_by_isbn: dict[str, list[str]] = {}
-    printers_by_isbn: dict[str, list[str]] = {}
-    for isbn, print_date, _fn, printer_label in all_printer_rows:
-        if not isbn:
+    printer_set = {r.isbn for r in all_printer_rows if r.isbn}
+    jobs_by_isbn: dict[str, list[PrinterSheetRow]] = {}
+    for row in all_printer_rows:
+        if not row.isbn:
             continue
-        dates_by_isbn.setdefault(isbn, []).append(print_date)
-        if printer_label:
-            printers_by_isbn.setdefault(isbn, []).append(printer_label)
+        jobs_by_isbn.setdefault(row.isbn, []).append(row)
 
     reconciliation_list_a = [isbn for isbn in list_a_isbns if isbn]
 
@@ -653,51 +821,75 @@ def build_normalized_workbook(
 
     for sheet_title, rows in sheets:
         ws = workbook.add_worksheet(sheet_title[:31])
-        for col, title in enumerate(["ISBN", "Print Date", "Source Filename"]):
+        for col, title in enumerate(PRINTER_ISBN_HEADERS):
             ws.write(0, col, title, header_fmt)
-        for i, (isbn, print_date, filename, _printer) in enumerate(rows, start=1):
-            ws.write_string(i, 0, isbn or "", text_fmt)
-            ws.write_string(i, 1, format_ops_date(print_date), text_fmt)
-            ws.write_string(i, 2, filename or "", text_fmt)
-        _finish_sheet(ws, max(1, len(rows)), 3)
+        for i, row in enumerate(rows, start=1):
+            values = [
+                row.isbn or "",
+                format_ops_date(row.print_date),
+                row.job_end or "",
+                row.print_start or "",
+                row.job_accept or "",
+                row.result or "",
+                row.set_number or "",
+                row.output_set or "",
+                row.printer or printer_label_from_sheet_title(sheet_title),
+                row.job_id or "",
+                row.source_filename or "",
+            ]
+            for col, val in enumerate(values):
+                ws.write_string(i, col, val, text_fmt)
+        _finish_sheet(ws, max(1, len(rows)), len(PRINTER_ISBN_HEADERS))
         ws.set_column(0, 0, 22)
-        ws.set_column(1, 1, 16)
-        ws.set_column(2, 2, 60)
+        ws.set_column(1, 8, 14)
+        ws.set_column(9, 9, 14)
+        ws.set_column(10, 10, 60)
 
     ws_recon = workbook.add_worksheet("Reconciliation")
-    for col, title in enumerate(
-        ["List A ISBN", "Printer ISBN", "Print Date", "Printer", "Status"]
-    ):
+    for col, title in enumerate(RECONCILIATION_HEADERS):
         ws_recon.write(0, col, title, header_fmt)
     for i, isbn in enumerate(reconciliation_list_a, start=1):
         found = isbn in printer_set
+        jobs = jobs_by_isbn.get(isbn, [])
         ws_recon.write_string(i, 0, isbn, text_fmt)
         if found:
             ws_recon.write_string(i, 1, isbn, text_fmt)
             ws_recon.write_string(
-                i,
-                2,
-                unique_print_dates_display(dates_by_isbn.get(isbn, [])),
-                text_fmt,
+                i, 2, join_occurrence_values([j.print_date for j in jobs], as_dates=True), text_fmt
+            )
+            ws_recon.write_string(
+                i, 3, join_occurrence_values([j.job_end for j in jobs]), text_fmt
+            )
+            ws_recon.write_string(
+                i, 4, join_occurrence_values([j.print_start for j in jobs]), text_fmt
+            )
+            ws_recon.write_string(
+                i, 5, join_occurrence_values([j.job_accept for j in jobs]), text_fmt
+            )
+            ws_recon.write_string(
+                i, 6, join_occurrence_values([j.result for j in jobs]), text_fmt
+            )
+            ws_recon.write_string(
+                i, 7, join_occurrence_values([j.set_number for j in jobs]), text_fmt
+            )
+            ws_recon.write_string(
+                i, 8, join_occurrence_values([j.output_set for j in jobs]), text_fmt
             )
             ws_recon.write_string(
                 i,
-                3,
-                unique_printers_display(printers_by_isbn.get(isbn, [])),
+                9,
+                join_occurrence_values([j.printer for j in jobs]),
                 text_fmt,
             )
-            ws_recon.write_string(i, 4, PRESENT, present_fmt)
+            ws_recon.write_string(i, 10, PRESENT, present_fmt)
         else:
-            ws_recon.write_string(i, 1, "", text_fmt)
-            ws_recon.write_string(i, 2, "", text_fmt)
-            ws_recon.write_string(i, 3, "", text_fmt)
-            ws_recon.write_string(i, 4, NOT_FOUND, not_found_fmt)
-    _finish_sheet(ws_recon, max(1, len(reconciliation_list_a)), 5)
-    ws_recon.set_column(0, 0, 22)
-    ws_recon.set_column(1, 1, 22)
-    ws_recon.set_column(2, 2, 28)
-    ws_recon.set_column(3, 3, 28)
-    ws_recon.set_column(4, 4, 14)
+            for col in range(1, 10):
+                ws_recon.write_string(i, col, "", text_fmt)
+            ws_recon.write_string(i, 10, NOT_FOUND, not_found_fmt)
+    _finish_sheet(ws_recon, max(1, len(reconciliation_list_a)), len(RECONCILIATION_HEADERS))
+    ws_recon.set_column(0, 1, 22)
+    ws_recon.set_column(2, 9, 16)
+    ws_recon.set_column(10, 10, 14)
 
     # Skipped rows may be (source_row, record, reason) or
     # (source_row, record, reason, printer_label)
@@ -753,15 +945,22 @@ def _finish_sheet(ws, data_rows: int, ncols: int) -> None:
 
 def _printer_rows_from_traces(
     traces: list[PrinterIsbnTrace],
-) -> list[tuple[str, str, str, str]]:
-    """(isbn, print_date_iso, source_filename, printer_label) per occurrence."""
+) -> list[PrinterSheetRow]:
+    """One Sheet 2 row per occurrence — all fields from the same printer job."""
     return [
-        (
-            t.normalized_identifier,
-            t.print_date or "",
-            t.document_filename or t.raw_4010_value or "",
-            t.printer_name
+        PrinterSheetRow(
+            isbn=t.normalized_identifier,
+            print_date=t.print_date or "",
+            job_end=t.job_end or "",
+            print_start=t.print_start or "",
+            job_accept=t.job_accept or "",
+            result=t.result or "",
+            set_number=t.set_number or "",
+            output_set=t.output_set or "",
+            printer=t.printer_name
             or (f"Printer {t.printer_slot}" if t.printer_slot in (1, 2, 3) else ""),
+            job_id=t.job_id or "",
+            source_filename=t.document_filename or t.raw_4010_value or "",
         )
         for t in traces
     ]
@@ -769,7 +968,7 @@ def _printer_rows_from_traces(
 
 def _printer_sheets_from_traces(
     traces: list[PrinterIsbnTrace],
-) -> list[tuple[str, list[tuple[str, str, str, str]]]]:
+) -> list[tuple[str, list[PrinterSheetRow]]]:
     """Group traces into ordered per-printer sheets."""
     by_slot: dict[int, list[PrinterIsbnTrace]] = {}
     unnamed: list[PrinterIsbnTrace] = []
@@ -779,7 +978,7 @@ def _printer_sheets_from_traces(
         else:
             unnamed.append(t)
 
-    sheets: list[tuple[str, list[tuple[str, str, str, str]]]] = []
+    sheets: list[tuple[str, list[PrinterSheetRow]]] = []
     for slot in sorted(by_slot):
         sample = by_slot[slot][0]
         title = printer_isbn_sheet_title(slot, sample.printer_name)
@@ -787,7 +986,6 @@ def _printer_sheets_from_traces(
     if unnamed:
         sheets.append(("Printer ISBNs", _printer_rows_from_traces(unnamed)))
     return sheets
-
 
 def _skipped_rows_from_traces(
     skipped: list[SkippedPrinterTrace],
@@ -895,19 +1093,21 @@ def export_normalized_for_run(db: Session, run_id: int) -> BytesIO:
     if run.status not in ("COMPLETED", "PARTIAL_SUCCESS"):
         raise ValueError("Please complete reconciliation before exporting the normalized report.")
 
-    list_a = (
-        db.query(ListARecord)
-        .filter(ListARecord.upload_id == run.list_a_upload_id)
-        .order_by(ListARecord.source_row_number, ListARecord.id)
-        .all()
-    )
-    if not list_a:
-        raise ValueError("Please complete reconciliation before exporting the normalized report.")
+    list_a = []
+    if run.list_a_upload_id is not None:
+        list_a = (
+            db.query(ListARecord)
+            .filter(ListARecord.upload_id == run.list_a_upload_id)
+            .order_by(ListARecord.source_row_number, ListARecord.id)
+            .all()
+        )
 
     result_count = (
         db.query(AutomatedResult).filter(AutomatedResult.run_id == run_id).count()
     )
-    if not result_count:
+    # Printer-only runs still produce AutomatedResult rows (printer audit); allow export
+    # with an empty List A sheet when no List A was used.
+    if not result_count and run.list_a_upload_id is not None:
         raise ValueError("Please complete reconciliation before exporting the normalized report.")
 
     list_a_isbns = [r.isbn_normalized for r in list_a if r.isbn_normalized]
@@ -949,7 +1149,8 @@ def export_normalized_for_run(db: Session, run_id: int) -> BytesIO:
     printer_sheets = _printer_sheets_from_traces(traces)
     skipped_rows = _skipped_rows_from_traces(skipped)
 
-    if not list_a_isbns:
+    # List A sheet may be empty for printer-search-only runs.
+    if run.list_a_upload_id is not None and not list_a_isbns:
         raise ValueError("No normalized List A identifiers are available for export.")
     if not printer_sheets or not any(rows for _, rows in printer_sheets):
         raise ValueError("No normalized Printer identifiers are available for export.")

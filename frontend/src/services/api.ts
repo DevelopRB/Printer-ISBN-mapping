@@ -2,6 +2,8 @@ import axios from 'axios'
 import type {
   AutomatedRun,
   ConnectionTestResult,
+  DirectIsbnSearchResponse,
+  DirectMultiIsbnSearchResponse,
   IsbnDetail,
   ListAUploadInfo,
   NetworkPrinterConfig,
@@ -11,6 +13,7 @@ import type {
   PrinterSummary,
   Project,
   ResultFilters,
+  RunSearchData,
   Summary,
   Upload,
 } from '../types'
@@ -168,8 +171,9 @@ export async function testNetworkPrinterConnection(
   slot: number,
 ): Promise<ConnectionTestResult> {
   try {
+    // Backend TCP/HTTP timeout is ~8s; keep client ceiling slightly above that.
     const { data } = await api.post(`/network-printers/${slot}/test-connection`, null, {
-      timeout: 30000,
+      timeout: 20000,
     })
     return data
   } catch (err) {
@@ -194,13 +198,18 @@ export async function uploadListAForAutomation(file: File): Promise<ListAUploadI
 }
 
 export async function startAutomatedRun(payload: {
-  list_a_id: number
+  list_a_id?: number | null
   printer_ids: number[]
   start_date: string
   end_date: string
 }): Promise<AutomatedRun> {
   try {
-    const { data } = await api.post('/reconciliation/run', payload)
+    const { data } = await api.post('/reconciliation/run', {
+      list_a_id: payload.list_a_id ?? null,
+      printer_ids: payload.printer_ids,
+      start_date: payload.start_date,
+      end_date: payload.end_date,
+    })
     return data
   } catch (err) {
     throw new Error(errorMessage(err, 'Failed to start reconciliation.'))
@@ -231,6 +240,109 @@ export async function getAutomatedPrinterRecords(
 ): Promise<PaginatedAutomatedResults> {
   const { data } = await api.get(`/reconciliation/run/${runId}/printer-records`, { params })
   return data
+}
+
+export async function getAutomatedSearchData(runId: number): Promise<RunSearchData> {
+  try {
+    const { data } = await api.get(`/reconciliation/run/${runId}/search-data`)
+    return data
+  } catch (err) {
+    throw new Error(errorMessage(err, 'Failed to load ISBN search data.'))
+  }
+}
+
+export async function directIsbnSearch(payload: {
+  isbn: string
+  printer_ids: number[]
+  start_date: string
+  end_date: string
+  list_a_id?: number | null
+}): Promise<DirectIsbnSearchResponse> {
+  try {
+    const { data } = await api.post(
+      '/reconciliation/search-isbn',
+      {
+        isbn: payload.isbn,
+        printer_ids: payload.printer_ids,
+        start_date: payload.start_date,
+        end_date: payload.end_date,
+        list_a_id: payload.list_a_id ?? null,
+      },
+      { timeout: 300000 },
+    )
+    return data
+  } catch (err) {
+    throw new Error(
+      errorMessage(err, 'Could not retrieve printer records. Please check printer connectivity and try again.'),
+    )
+  }
+}
+
+export async function directMultiIsbnSearch(payload: {
+  isbns: string[]
+  printer_ids: number[]
+  start_date: string
+  end_date: string
+  list_a_id?: number | null
+  entered_count?: number
+}): Promise<DirectMultiIsbnSearchResponse> {
+  try {
+    const { data } = await api.post(
+      '/reconciliation/search-isbns',
+      {
+        isbns: payload.isbns,
+        printer_ids: payload.printer_ids,
+        start_date: payload.start_date,
+        end_date: payload.end_date,
+        list_a_id: payload.list_a_id ?? null,
+        entered_count: payload.entered_count ?? payload.isbns.length,
+      },
+      { timeout: 300000 },
+    )
+    return data
+  } catch (err) {
+    throw new Error(
+      errorMessage(err, 'Could not retrieve printer records. Please check printer connectivity and try again.'),
+    )
+  }
+}
+
+export type SearchResultExportRow = {
+  isbn: string
+  list_a: string
+  printer: string
+  /** Same printer print_date shown in Search Results UI (ISO or display form). */
+  print_date: string
+  job_end: string
+  print_start: string
+  job_accept: string
+  result: string
+  set_number: string
+  output_set: string
+  source_filename: string
+  status: string
+}
+
+/** Download Excel for already-displayed Search Results (no printer refetch). */
+export async function exportSearchResults(rows: SearchResultExportRow[]): Promise<void> {
+  try {
+    const { data } = await api.post(
+      '/reconciliation/search-results/export',
+      { rows },
+      { responseType: 'blob', timeout: 120000 },
+    )
+    const blob = data instanceof Blob ? data : new Blob([data])
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'ISBN_Search_Results.xlsx'
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    window.URL.revokeObjectURL(url)
+  } catch (err) {
+    throw new Error(errorMessage(err, 'Failed to export search results.'))
+  }
 }
 
 export async function retryFailedPrinters(runId: number): Promise<AutomatedRun> {

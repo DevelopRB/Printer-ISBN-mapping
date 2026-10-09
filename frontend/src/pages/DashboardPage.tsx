@@ -154,30 +154,24 @@ export function DashboardPage() {
   return (
     <AppLayout>
       <div>
-        <header className="border-b border-slate-200 bg-white">
-          <div className="mx-auto flex max-w-[1400px] items-center justify-between gap-4 px-4 py-4 sm:px-6">
+        <header className="border-b border-slate-200/80 bg-white/90 backdrop-blur-sm">
+          <div className="mx-auto flex max-w-[1400px] flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6">
             <div>
-              <h1 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
-                Printing Reconciliation System
-              </h1>
-              <p className="mt-0.5 text-sm text-slate-500">
-                List A is source of truth · ISBN matching only · Backend {health}
+              <div className="ui-section-label mb-1">Emergency / Fallback</div>
+              <h1 className="ui-page-title">Manual Reconciliation</h1>
+              <p className="ui-page-subtitle">
+                Upload List A and printer Excel files manually when automated download is
+                unavailable. Backend {health}.
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {project?.reconciled_at && (
                 <>
-                  <a
-                    href={exportUrl(project.id)}
-                    className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                  >
+                  <a href={exportUrl(project.id)} className="ui-btn-secondary">
                     <Download size={16} />
                     Export Detailed Report
                   </a>
-                  <a
-                    href={normalizedExportUrl(project.id)}
-                    className="inline-flex items-center gap-2 rounded-md border border-slate-800 bg-slate-800 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700"
-                  >
+                  <a href={normalizedExportUrl(project.id)} className="ui-btn-primary">
                     <Download size={16} />
                     Export Normalized Report
                   </a>
@@ -185,7 +179,7 @@ export function DashboardPage() {
               )}
               <button
                 type="button"
-                className="inline-flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50"
+                className="ui-btn-secondary"
                 onClick={async () => {
                   if (!project) return
                   await refreshProject(project.id)
@@ -199,7 +193,7 @@ export function DashboardPage() {
           </div>
         </header>
 
-        <main className="mx-auto max-w-[1400px] space-y-6 px-4 py-6 sm:px-6">
+        <main className="ui-page">
           {project && (
             <UploadWorkflow
               printers={project.printers}
@@ -215,9 +209,7 @@ export function DashboardPage() {
           {project?.reconciled_at && (
             <>
               <section className="space-y-3">
-                <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
-                  Dashboard
-                </h2>
+                <h2 className="ui-section-label">Dashboard</h2>
                 <SummaryCards summary={summary} />
               </section>
 

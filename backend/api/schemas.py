@@ -190,7 +190,7 @@ class ConnectionTestOut(BaseModel):
 
 
 class AutomatedRunCreate(BaseModel):
-    list_a_id: int
+    list_a_id: int | None = None
     printer_ids: list[int] = Field(..., min_length=1)
     start_date: str  # YYYY-MM-DD
     end_date: str
@@ -234,7 +234,7 @@ class AutomatedRunSummary(BaseModel):
 
 class AutomatedRunOut(BaseModel):
     id: int
-    list_a_upload_id: int
+    list_a_upload_id: int | None = None
     list_a_filename: str | None = None
     list_a_record_count: int = 0
     list_a_isbn_count: int = 0
@@ -271,4 +271,124 @@ class PaginatedAutomatedResults(BaseModel):
     page: int
     page_size: int
     items: list[AutomatedResultOut]
+
+
+class PrinterSearchOccurrenceOut(BaseModel):
+    """One printer document occurrence for in-app ISBN search (not deduplicated)."""
+
+    isbn: str
+    print_date: str | None = None
+    printer_name: str
+    printer_slot: int
+    source_filename: str | None = None
+    source_row: int | None = None
+    job_id: str | None = None
+    job_end: str | None = None
+    print_start: str | None = None
+    job_accept: str | None = None
+    result: str | None = None
+    set_number: str | None = None
+    output_set: str | None = None
+
+
+class RunSearchDataOut(BaseModel):
+    """Processed List A + printer data for a completed run — used to build search indexes.
+
+    printer_occurrences MUST come from the same normalized printer dataset used for
+    Excel Sheet 2 (Printer ISBNs) / Reconciliation — not a divergent snapshot.
+    """
+
+    run_id: int
+    start_date: str | None = None
+    end_date: str | None = None
+    list_a_isbns: list[str]
+    printer_occurrences: list[PrinterSearchOccurrenceOut]
+
+
+class DirectIsbnSearchCreate(BaseModel):
+    """Fetch printer records for a date range and search one ISBN (no reconciliation)."""
+
+    isbn: str = Field(..., min_length=1)
+    printer_ids: list[int] = Field(..., min_length=1)
+    start_date: str  # YYYY-MM-DD
+    end_date: str
+    list_a_id: int | None = None
+
+
+class DirectMultiIsbnSearchCreate(BaseModel):
+    """Fetch printer records once per printer, then search many ISBNs (no reconciliation)."""
+
+    isbns: list[str] = Field(..., min_length=1)
+    printer_ids: list[int] = Field(..., min_length=1)
+    start_date: str  # YYYY-MM-DD
+    end_date: str
+    list_a_id: int | None = None
+    entered_count: int | None = None  # raw pasted count before input dedupe
+
+
+class DirectSearchPrinterStatusOut(BaseModel):
+    slot: int
+    name: str
+    ok: bool
+    record_count: int = 0
+    match_count: int = 0
+    error: str | None = None
+
+
+class DirectIsbnSearchOut(BaseModel):
+    query: str
+    normalized_isbn: str
+    start_date: str
+    end_date: str
+    list_a: bool | None = None  # None = no List A loaded
+    printer: bool
+    status: str
+    occurrences: list[PrinterSearchOccurrenceOut] = []
+    printers: list[DirectSearchPrinterStatusOut] = []
+    steps: list[dict] = []
+
+
+class DirectBatchItemOut(BaseModel):
+    query: str
+    normalized_isbn: str
+    list_a: bool | None = None
+    printer: bool
+    status: str
+    occurrences: list[PrinterSearchOccurrenceOut] = []
+
+
+class DirectMultiIsbnSearchOut(BaseModel):
+    start_date: str
+    end_date: str
+    entered_count: int
+    unique_count: int
+    found_count: int
+    not_found_count: int
+    connection_issue_count: int
+    results: list[DirectBatchItemOut] = []
+    printers: list[DirectSearchPrinterStatusOut] = []
+    steps: list[dict] = []
+
+
+class SearchResultExportRow(BaseModel):
+    """One displayed Search Results row — Print Date comes from the UI record."""
+
+    isbn: str
+    list_a: str = "N/A"
+    printer: str = ""
+    print_date: str = ""  # same printer print_date shown in Search Results UI
+    job_end: str = ""
+    print_start: str = ""
+    job_accept: str = ""
+    result: str = ""
+    set_number: str = ""
+    output_set: str = ""
+    source_filename: str = ""
+    status: str = ""
+
+
+class SearchResultsExportCreate(BaseModel):
+    """Export already-loaded Search Results to Excel (no printer refetch)."""
+
+    rows: list[SearchResultExportRow] = Field(..., min_length=1)
 

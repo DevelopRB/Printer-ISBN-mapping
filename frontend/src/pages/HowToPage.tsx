@@ -4,306 +4,710 @@ import { AppLayout } from '../components/AppLayout'
 export function HowToPage() {
   return (
     <AppLayout>
-      <main className="mx-auto max-w-3xl space-y-8 px-4 py-6 sm:px-6">
+      <main className="mx-auto max-w-3xl space-y-6 px-4 py-6 sm:px-6">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">How to use this app</h1>
-          <p className="mt-2 text-sm leading-relaxed text-slate-600">
-            This guide explains, in simple steps, how to check whether books from your List A were
-            printed on Printer 1, Printer 2, or Printer 3. You do not need any technical knowledge.
+          <div className="ui-section-label mb-1">Guide</div>
+          <h1 className="ui-page-title">How to use</h1>
+          <p className="ui-page-subtitle">
+            A simple guide for Operations. When you open Printing Reconciliation, you start on{' '}
+            <strong className="font-semibold text-slate-800">Automated Reconciliation</strong> — that
+            is the normal daily workflow. Follow the steps below. No technical knowledge needed.
           </p>
+
+          <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {[
+              ['01', 'Upload List A'],
+              ['02', 'Select Printer & Dates'],
+              ['03', 'Fetch Printer Data'],
+              ['04', 'Review Results'],
+              ['05', 'Search ISBN'],
+              ['06', 'Export Report'],
+            ].map(([n, label]) => (
+              <div
+                key={n}
+                className="flex items-center gap-2.5 rounded-lg border border-slate-200 bg-white px-3 py-2.5 shadow-sm"
+              >
+                <span className="ui-step-badge text-[10px]">{n}</span>
+                <span className="text-xs font-medium text-slate-800">{label}</span>
+              </div>
+            ))}
+          </div>
+
+          <nav className="mt-4 flex flex-wrap gap-2 text-xs">
+            {[
+              ['#overview', 'Overview'],
+              ['#before', 'Before you start'],
+              ['#list-a', 'Upload List A'],
+              ['#printer-dates', 'Printer & dates'],
+              ['#download', 'Download'],
+              ['#printer-data', 'Printer data'],
+              ['#reconcile', 'Reconciliation'],
+              ['#search', 'Search ISBN'],
+              ['#print-details', 'Print details'],
+              ['#quantities', 'Quantities'],
+              ['#export', 'Export'],
+              ['#sheets', 'Excel sheets'],
+              ['#statuses', 'Statuses'],
+              ['#skipped', 'Skipped'],
+              ['#problems', 'Problems'],
+              ['#workflow', 'Quick workflow'],
+            ].map(([href, label]) => (
+              <a
+                key={href}
+                href={href}
+                className="rounded-md border border-slate-200 bg-white px-2 py-1 text-slate-700 shadow-sm transition-colors duration-150 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-900"
+              >
+                {label}
+              </a>
+            ))}
+          </nav>
         </div>
 
-        <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="text-base font-semibold text-slate-900">What this app does</h2>
-          <p className="mt-2 text-sm leading-relaxed text-slate-600">
-            You have a list of book numbers (ISBNs) in an Excel file called List A. The printers also
-            keep a record of what they printed. This app downloads those printer records for the
-            dates you choose, finds the book numbers in the printer filenames, and tells you which
-            List A books were printed and which were not. At the end you download one Excel report.
-          </p>
-        </section>
-
-        <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="text-base font-semibold text-slate-900">Before you start</h2>
-          <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-relaxed text-slate-600">
-            <li>Sit at a computer that is connected to the office printer network.</li>
-            <li>
-              Keep your List A Excel file ready — usually a file with the list of ISBNs that you give to the printer, or that you keep with yourself.
-            </li>
-            <li>Know which dates you want to check (for example: 1 August to 26 August).</li>
-            <li>
-              If a printer password was never set up on this computer, ask IT for help first. You
-              will not type passwords inside this app.
-            </li>
-          </ol>
-        </section>
-
-        <Step
-          number={1}
-          title="Connect to the printers"
-          linkTo="/printers"
-          linkLabel="Open Connect to Printer"
-        >
-          <p>This step only checks that each printer is reachable. It does not download book data yet.</p>
-          <ol className="mt-3 list-decimal space-y-2 pl-5">
-            <li>
-              Click <strong>Connect to Printer</strong> at the top of the screen.
-            </li>
-            <li>
-              You will see Printer 1, Printer 2, and Printer 3.
-            </li>
-            <li>
-              For each printer you plan to use, click <strong>Test Connection</strong>.
-            </li>
-            <li>
-              Wait a few seconds. If it says <strong>Connected</strong>, that printer is ready.
-            </li>
-            <li>
-              If it fails, check that your computer is on the printer network. If it still fails,
-              ask IT for help. Do not continue until at least one printer is connected.
-            </li>
-          </ol>
-        </Step>
-
-        <Step
-          number={2}
-          title="Go to Automated Reconciliation"
-          linkTo="/automated"
-          linkLabel="Open Automated Reconciliation"
-        >
+        {/* 1. Overview */}
+        <Section id="overview" title="1. Overview">
           <p>
-            This is the main page you will use every day. Click{' '}
-            <strong>Automated Reconciliation</strong> at the top of the screen.
+            Printing Reconciliation helps you compare the ISBNs sent to the printer with the books
+            that were actually processed by the printer.
           </p>
-        </Step>
+          <p className="mt-2">
+            The application can connect to the configured printers, retrieve printing records for a
+            selected date range, identify ISBNs from printer filenames, and show whether each List A
+            ISBN was found.
+          </p>
+          <p className="mt-2">
+            You can also search for any ISBN and view its printing history, including when it was
+            printed and how many copies were requested and printed.
+          </p>
+        </Section>
 
-        <Step number={3} title="Upload or choose your List A file">
-          <ol className="mt-1 list-decimal space-y-2 pl-5">
+        {/* 2. Before You Start */}
+        <Section id="before" title="2. Before you start">
+          <p className="mb-3">Before using the application:</p>
+          <ul className="list-disc space-y-2 pl-5">
+            <li>Make sure your computer is connected to the office printer network.</li>
+            <li>Make sure you have the correct List A Excel file.</li>
+            <li>Know which printer you want to check.</li>
+            <li>Know the date range you want to investigate.</li>
+          </ul>
+          <p className="mt-3">The application currently supports:</p>
+          <ul className="mt-1 list-disc pl-5">
+            <li>Printer 1</li>
+            <li>Printer 2</li>
+            <li>Printer 3</li>
+          </ul>
+          <Note>
+            Optional first check: open <strong>Connect to Printer</strong> and click{' '}
+            <strong>Test Connection</strong> for each printer you plan to use. If it shows{' '}
+            <strong>Connected</strong>, that printer is ready. Passwords are set up by IT — they are
+            never shown in the app.
+          </Note>
+          <div className="mt-3">
+            <Link
+              to="/printers"
+              className="inline-flex rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
+            >
+              Open Connect to Printer
+            </Link>
+          </div>
+        </Section>
+
+        {/* 3. Upload List A */}
+        <Section id="list-a" title="3. Upload List A">
+          <p className="mb-3">
+            List A is the list of ISBNs / books that were given to the printer for printing.
+          </p>
+          <ol className="list-decimal space-y-2 pl-5">
             <li>
-              Under <strong>Step 1 — Select List A</strong>, either:
-              <ul className="mt-2 list-disc space-y-1 pl-5">
-                <li>
-                  Choose a List A file you already uploaded from the dropdown, or
-                </li>
-                <li>
-                  Click <strong>Upload New List A</strong> and pick your Excel file from your
-                  computer.
-                </li>
-              </ul>
+              Open <strong>Automated Reconciliation</strong> (main page for daily use).
             </li>
-            <li>Wait until the green box appears showing the file name and how many rows it found.</li>
             <li>
-              If the upload fails, make sure the file is a normal Excel file (.xlsx) and that it has
-              an ISBN column. If you are unsure, ask a colleague who prepares List A.
+              Under <strong>Step 1 — Select List A</strong>, either choose an existing List A from
+              the dropdown, or click <strong>Upload New List A</strong> and pick your Excel file.
+            </li>
+            <li>
+              Wait for the green confirmation box showing the file name, record count, and how many
+              ISBNs were detected.
             </li>
           </ol>
-        </Step>
+          <Note>
+            The application keeps the original List A ISBN entries, including duplicates. You do not
+            need to remove duplicate rows before uploading.
+          </Note>
+          <div className="mt-3">
+            <Link
+              to="/automated"
+              className="inline-flex rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
+            >
+              Open Automated Reconciliation
+            </Link>
+          </div>
+        </Section>
 
-        <Step number={4} title="Choose which printers to use">
-          <ol className="mt-1 list-decimal space-y-2 pl-5">
+        {/* 4. Select Printer and Date Range */}
+        <Section id="printer-dates" title="4. Select printer and date range">
+          <h3 className="mb-2 text-sm font-semibold text-slate-800">Select printer</h3>
+          <ol className="list-decimal space-y-2 pl-5">
             <li>
-              Under <strong>Step 2 — Connect to Printer</strong>, tick the printers you want.
+              Under <strong>Step 2 — Connect to Printer</strong>, tick the printer(s) you want.
             </li>
-            <li>You can choose one printer, or two, or all three.</li>
+            <li>You can choose one printer, or more than one.</li>
             <li>
-              If you want all of them, click <strong>Select All Printers</strong>.
+              To select everything, click <strong>Select All Printers</strong>.
             </li>
           </ol>
-        </Step>
 
-        <Step number={5} title="Choose the report date range">
-          <ol className="mt-1 list-decimal space-y-2 pl-5">
+          <h3 className="mb-2 mt-4 text-sm font-semibold text-slate-800">Select date range</h3>
+          <ol className="list-decimal space-y-2 pl-5">
             <li>
               Under <strong>Step 3 — Report Date Range</strong>, set:
               <ul className="mt-2 list-disc space-y-1 pl-5">
                 <li>
-                  <strong>From Date</strong> — the first day you want to include
+                  <strong>From Date</strong> — first day to include
                 </li>
                 <li>
-                  <strong>To Date</strong> — the last day you want to include
+                  <strong>To Date</strong> — last day to include
                 </li>
               </ul>
             </li>
             <li>
-              Example: From 01-Aug-2026 To 26-Aug-2026 means “get everything those printers printed
-              between those two dates.”
-            </li>
-            <li>The From date must be on or before the To date.</li>
-            <li>You cannot choose a date in the future — only today or earlier dates are allowed.</li>
-          </ol>
-          <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
-            <strong>Important:</strong> This date range only controls <em>which jobs are
-            downloaded</em>. Later, each book’s own print date in the Excel report comes from the
-            printer’s job record — not from today’s date, and not from the day you clicked download.
-          </div>
-        </Step>
-
-        <Step number={6} title="Download printer data and reconcile">
-          <ol className="mt-1 list-decimal space-y-2 pl-5">
-            <li>
-              Click the big button: <strong>Download Printer Data &amp; Reconcile</strong>.
-            </li>
-            <li>Wait. The app will connect to each selected printer and download the jobs.</li>
-            <li>You will see progress steps (connecting, downloading, matching, and so on).</li>
-            <li>
-              When it is finished, a popup appears that says{' '}
-              <strong>Ready to export your file</strong>.
-            </li>
-            <li>
-              If something fails, read the simple message on screen. Often it means the printer
-              could not be reached — check the network and try again, or ask IT.
+              Example: From <strong>01-Aug-2026</strong> to <strong>26-Aug-2026</strong>
             </li>
           </ol>
-        </Step>
-
-        <Step number={7} title="Export the Normalized Report">
-          <ol className="mt-1 list-decimal space-y-2 pl-5">
-            <li>
-              In the popup, click <strong>Export Normalized Report</strong>.
-            </li>
-            <li>Or, if you closed the popup, use the same button lower on the page.</li>
-            <li>An Excel file will download to your computer. Open it with Excel.</li>
-          </ol>
-        </Step>
-
-        <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="text-base font-semibold text-slate-900">
-            Step 8 — Understand the Excel file
-          </h2>
-          <p className="mt-2 text-sm leading-relaxed text-slate-600">
-            The report has several sheets (tabs at the bottom of Excel). Open them one by one:
+          <p className="mt-3">
+            The selected date range tells the application which period of printer activity to
+            retrieve.
           </p>
+          <Note>
+            The selected date range is <strong>not</strong> necessarily the print date of every
+            book. Each individual printer job has its own actual <strong>Print Date</strong>.
+          </Note>
+        </Section>
 
-          <div className="mt-4 space-y-4 text-sm leading-relaxed text-slate-600">
-            <SheetExplain title="List A ISBNs">
-              Every book number from your List A file, in the same order, including duplicates. If
-              List A had 87 rows, this sheet has 87 rows.
-            </SheetExplain>
-            <SheetExplain title="Printer 1 ISBNs / Printer 2 ISBNs / Printer 3 ISBNs">
-              One sheet for each printer you selected. Each row is one printed job that had a book
-              number in the filename. Columns are:
-              <ul className="mt-2 list-disc space-y-1 pl-5">
-                <li>
-                  <strong>ISBN</strong> — the book number found in the filename
-                </li>
-                <li>
-                  <strong>Print Date</strong> — the day that job was printed on the printer
-                </li>
-                <li>
-                  <strong>Source Filename</strong> — the original printer filename
-                </li>
-              </ul>
-              The same book number can appear more than once if it was printed more than once.
-            </SheetExplain>
-            <SheetExplain title="Reconciliation">
-              One row for every List A row. Status is:
-              <ul className="mt-2 list-disc space-y-1 pl-5">
-                <li>
-                  <strong>PRESENT</strong> — this book was found on at least one selected printer
-                </li>
-                <li>
-                  <strong>NOT FOUND</strong> — this book was not found in the downloaded printer data
-                </li>
-              </ul>
-              If it is PRESENT, the Print Date column shows when it was printed (or dates, if it
-              printed more than once), and the Printer column shows which printer(s) it came from
-              (for example Printer 1, or Printer 1, Printer 2 if it was found on more than one).
-            </SheetExplain>
-            <SheetExplain title="Skipped ISBNs">
-              Printer jobs where no book number could be found (for example “CE Adjust”). These are
-              not treated as books. They are listed here so nothing is silently ignored.
-            </SheetExplain>
-          </div>
-        </section>
-
-        <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="text-base font-semibold text-slate-900">Three different dates (do not mix them)</h2>
-          <dl className="mt-3 space-y-3 text-sm leading-relaxed text-slate-600">
-            <div>
-              <dt className="font-medium text-slate-800">1. Report Date Range</dt>
-              <dd>
-                The From / To dates you chose. Example: 01-Aug-2026 → 26-Aug-2026.
-              </dd>
-            </div>
-            <div>
-              <dt className="font-medium text-slate-800">2. Print Date</dt>
-              <dd>
-                The date on each printer job for that book. Example: 25-Aug-2026. This is what
-                Operations usually cares about for “when was it printed?”
-              </dd>
-            </div>
-            <div>
-              <dt className="font-medium text-slate-800">3. Downloaded On</dt>
-              <dd>
-                The date and time you ran the download on this computer. Example: 27-Aug-2026 11:30
-                AM. This is not the print date.
-              </dd>
-            </div>
+        {/* 5. Download Printer Data */}
+        <Section id="download" title="5. Download printer data">
+          <ol className="list-decimal space-y-2 pl-5">
+            <li>
+              Click <strong>Download Printer Data &amp; Reconcile</strong>.
+            </li>
+            <li>
+              The application connects to the selected printer(s) and retrieves printing records for
+              the selected date range.
+            </li>
+            <li>Watch the progress steps until the run finishes.</li>
+          </ol>
+          <p className="mt-3">After a successful download you will see details such as:</p>
+          <ExampleBox>
+            <div>Printer: Printer 1</div>
+            <div>Report Date Range: 01-Aug-2026 → 26-Aug-2026</div>
+            <div>Records Retrieved: 2,282</div>
+            <div>ISBN Records: 2,254</div>
+            <div>Skipped Records: 28</div>
+            <div>Downloaded On: 27-Aug-2026 11:30 AM</div>
+          </ExampleBox>
+          <dl className="mt-4 space-y-3">
+            <Term name="Report Date Range">
+              The period you requested from the printer (your From / To dates).
+            </Term>
+            <Term name="Downloaded On">
+              The date and time the application retrieved the printer information on this computer.
+            </Term>
+            <Term name="Print Date">
+              The actual date on which an individual print job occurred (from the printer job
+              record).
+            </Term>
           </dl>
-        </section>
+        </Section>
 
-        <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="text-base font-semibold text-slate-900">Opening an old run again</h2>
-          <p className="mt-2 text-sm leading-relaxed text-slate-600">
-            At the bottom of Automated Reconciliation, use the{' '}
-            <strong>Reconciliation History</strong> dropdown. Pick a previous run to see its summary
-            and export the report again. You do not need to download from the printers again unless
-            you want a new date range or fresh data.
+        {/* 6. Understanding Downloaded Printer Data */}
+        <Section id="printer-data" title="6. Understanding downloaded printer data">
+          <p className="mb-3">
+            The printer provides detailed information for each printing job. The application
+            extracts useful fields such as:
           </p>
-        </section>
+          <dl className="space-y-3">
+            <Term name="ISBN">The book identifier extracted from the printer&apos;s filename.</Term>
+            <Term name="Print Date">The date the printer recorded for that job.</Term>
+            <Term name="Job End">The time the printing job ended.</Term>
+            <Term name="Print Start">The time printing started.</Term>
+            <Term name="Job Accept">The time the printer accepted the job.</Term>
+            <Term name="Result">The result / status reported by the printer (for example Complete).</Term>
+            <Term name="Set Number">The number of sets / copies requested for the job.</Term>
+            <Term name="Output Set">
+              The number of sets / copies actually printed / output by the printer.
+            </Term>
+            <Term name="Printer">Which printer processed the job.</Term>
+            <Term name="Job ID">The printer&apos;s identifier for that particular print job.</Term>
+            <Term name="Source Filename">The original filename recorded by the printer.</Term>
+          </dl>
+        </Section>
 
-        <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="text-base font-semibold text-slate-900">
-            Manual Reconciliation (only if needed)
-          </h2>
-          <p className="mt-2 text-sm leading-relaxed text-slate-600">
-            Most days you should use <strong>Automated Reconciliation</strong>. Use{' '}
-            <Link className="font-medium text-sky-800 underline" to="/">
-              Manual Reconciliation
-            </Link>{' '}
-            only if someone gives you Excel files that were already downloaded from the printers by
-            hand, and you need to match those files against List A without connecting to the
-            printers.
+        {/* 7. Reconciliation */}
+        <Section id="reconcile" title="7. Reconciliation">
+          <p>
+            After printer data is downloaded, the application compares List A with the printer
+            records.
           </p>
-        </section>
+          <p className="mt-2">The reconciliation answers:</p>
+          <p className="mt-1 font-medium text-slate-800">
+            “Was this ISBN found in the printer records?”
+          </p>
+          <div className="mt-3 overflow-x-auto rounded-md border border-slate-200">
+            <table className="min-w-full text-left text-sm">
+              <thead className="bg-slate-100 text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-3 py-2 font-medium">Status</th>
+                  <th className="px-3 py-2 font-medium">Meaning</th>
+                </tr>
+              </thead>
+              <tbody className="text-slate-700">
+                <tr className="border-t border-slate-100">
+                  <td className="px-3 py-2 font-semibold text-green-800">PRESENT</td>
+                  <td className="px-3 py-2">
+                    The ISBN was found at least once in the printer records.
+                  </td>
+                </tr>
+                <tr className="border-t border-slate-100">
+                  <td className="px-3 py-2 font-semibold text-amber-900">NOT FOUND</td>
+                  <td className="px-3 py-2">
+                    The ISBN was not found in the printer records retrieved for the selected date
+                    range.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-3">
+            On the screen you will also see summary cards for Found / Not Found. In the exported
+            Excel Reconciliation sheet, the Status column uses <strong>PRESENT</strong> and{' '}
+            <strong>NOT FOUND</strong>.
+          </p>
+        </Section>
 
-        <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="text-base font-semibold text-slate-900">If something goes wrong</h2>
-          <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-relaxed text-slate-600">
+        {/* 8. Search Any ISBN */}
+        <Section id="search" title="8. Search any ISBN">
+          <p className="mb-3">
+            Use <strong>Search an ISBN</strong> at the top of Automated Reconciliation. Enter an
+            ISBN, choose a date range, and click <strong>Search</strong> — printer records are
+            fetched automatically. List A is <strong>not</strong> required. You do not need to click
+            Download Printer Data &amp; Reconcile first.
+          </p>
+          <ol className="list-decimal space-y-2 pl-5">
+            <li>Select the printers to check (same checkboxes used for reconciliation).</li>
+            <li>Enter the ISBN / identifier.</li>
+            <li>Select From Date and To Date.</li>
             <li>
-              <strong>Cannot connect to a printer</strong> — Make sure you are on the office
-              printer network. Then try Test Connection again. If it still fails, ask IT.
+              Click <strong>Search</strong> or press Enter.
             </li>
-            <li>
-              <strong>List A will not upload</strong> — Use a normal Excel file (.xlsx) with an ISBN
-              column. Do not upload a Word document or a random text file.
-            </li>
-            <li>
-              <strong>No records found</strong> — The date range may have no jobs on that printer.
-              Try a wider date range, or confirm printing happened on those days.
-            </li>
-            <li>
-              <strong>Wrong date range</strong> — From date must be earlier than or equal to To
-              date. Future dates are not allowed.
-            </li>
-            <li>
-              <strong>Need a password fixed</strong> — Passwords are set by IT on the computer. They
-              are never shown on the screen. Ask IT; do not look for a password box in the app.
-            </li>
-          </ul>
-        </section>
-
-        <section className="rounded-lg border border-slate-200 bg-slate-50 p-5">
-          <h2 className="text-base font-semibold text-slate-900">Quick checklist</h2>
-          <ol className="mt-3 list-decimal space-y-1.5 pl-5 text-sm text-slate-700">
-            <li>Connect to Printer → Test Connection</li>
-            <li>Automated Reconciliation → Upload List A</li>
-            <li>Select printers</li>
-            <li>Set From date and To date</li>
-            <li>Download Printer Data &amp; Reconcile</li>
-            <li>When the popup appears → Export Normalized Report</li>
-            <li>Open the Excel file and check Reconciliation</li>
+            <li>View the result and full print history.</li>
           </ol>
+          <ExampleBox>
+            <div>Search: 9788182054370</div>
+            <div>Range: 20-Aug-2026 → 27-Aug-2026</div>
+            <div className="mt-2">ISBN: 9788182054370</div>
+            <div>List A: N/A</div>
+            <div>Printer: YES</div>
+            <div>Status: FOUND IN PRINTER DATA</div>
+            <div className="mt-2">Print History: 24-Aug-2026 · Printer 1</div>
+          </ExampleBox>
+          <Note>
+            Search uses the date range you select each time. If an ISBN is not found, it may still
+            exist outside that range — widen the dates and search again.
+          </Note>
+          <p className="mt-3">
+            Recent searches appear under the box — click one to restore the ISBN and date range.
+            Use <strong>Clear</strong> to reset the search.
+          </p>
+        </Section>
+
+        {/* 9. Understanding Print Details */}
+        <Section id="print-details" title="9. Understanding print details">
+          <p className="mb-3">
+            The application can show the complete <strong>Print History</strong> for an ISBN. If an
+            ISBN was printed multiple times, each print occurrence is kept separately. The
+            application does <strong>not</strong> combine or remove duplicate printer occurrences.
+          </p>
+          <ExampleBox>
+            <div className="font-medium">ISBN: 8888001171897</div>
+            <div className="mt-2 overflow-x-auto">
+              <table className="min-w-full text-left text-xs">
+                <thead>
+                  <tr className="text-slate-500">
+                    <th className="pr-3 py-1">Date</th>
+                    <th className="pr-3 py-1">Printer</th>
+                    <th className="pr-3 py-1">Job End</th>
+                    <th className="pr-3 py-1">Print Start</th>
+                    <th className="py-1">Job Accept</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="pr-3 py-1">26-Aug-2026</td>
+                    <td className="pr-3 py-1">Printer 1</td>
+                    <td className="pr-3 py-1">10:20:00</td>
+                    <td className="pr-3 py-1">10:18:00</td>
+                    <td className="py-1">10:18:00</td>
+                  </tr>
+                  <tr>
+                    <td className="pr-3 py-1">27-Aug-2026</td>
+                    <td className="pr-3 py-1">Printer 1</td>
+                    <td className="pr-3 py-1">14:30:00</td>
+                    <td className="pr-3 py-1">14:25:00</td>
+                    <td className="py-1">14:25:00</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div className="mt-2 overflow-x-auto">
+              <table className="min-w-full text-left text-xs">
+                <thead>
+                  <tr className="text-slate-500">
+                    <th className="pr-3 py-1">Result</th>
+                    <th className="pr-3 py-1">Set Number</th>
+                    <th className="py-1">Output Set</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="pr-3 py-1">Complete</td>
+                    <td className="pr-3 py-1">2</td>
+                    <td className="py-1">2</td>
+                  </tr>
+                  <tr>
+                    <td className="pr-3 py-1">Complete</td>
+                    <td className="pr-3 py-1">3</td>
+                    <td className="py-1">3</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </ExampleBox>
+          <p className="mt-3">
+            In <strong>Search ISBN</strong>, quantities may also be labelled{' '}
+            <strong>Copies Requested</strong> (Set Number) and <strong>Copies Printed</strong>{' '}
+            (Output Set) for easier reading.
+          </p>
+        </Section>
+
+        {/* 10. Understanding Quantities */}
+        <Section id="quantities" title="10. Understanding quantities">
+          <div className="overflow-x-auto rounded-md border border-slate-200">
+            <table className="min-w-full text-left text-sm">
+              <thead className="bg-slate-100 text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-3 py-2 font-medium">Field</th>
+                  <th className="px-3 py-2 font-medium">Meaning</th>
+                </tr>
+              </thead>
+              <tbody className="text-slate-700">
+                <tr className="border-t border-slate-100">
+                  <td className="px-3 py-2 font-medium">Set Number</td>
+                  <td className="px-3 py-2">Number of copies / sets requested</td>
+                </tr>
+                <tr className="border-t border-slate-100">
+                  <td className="px-3 py-2 font-medium">Output Set</td>
+                  <td className="px-3 py-2">Number of copies / sets actually printed / output</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <ExampleBox>
+            <div>
+              <strong>Set Number: 3</strong> · <strong>Output Set: 3</strong>
+            </div>
+            <div className="mt-1">Means: 3 requested, 3 printed</div>
+            <div className="mt-3">
+              <strong>Set Number: 3</strong> · <strong>Output Set: 2</strong>
+            </div>
+            <div className="mt-1">Means: 3 requested, 2 printed</div>
+          </ExampleBox>
+          <Note>
+            The application uses the values reported by the printer. It does not assume that
+            requested quantity equals printed quantity.
+          </Note>
+        </Section>
+
+        {/* 11. Export Normalized Report */}
+        <Section id="export" title="11. Export Normalized Report">
+          <ol className="list-decimal space-y-2 pl-5">
+            <li>
+              When processing finishes, a popup may say <strong>Ready to export your file</strong>.
+            </li>
+            <li>
+              Click <strong>Export Normalized Report</strong> (in the popup, or on the page).
+            </li>
+            <li>Open the downloaded Excel file.</li>
+          </ol>
+          <p className="mt-3">The report helps you see:</p>
+          <ul className="mt-2 list-disc space-y-1 pl-5">
+            <li>What was sent to the printer (List A)</li>
+            <li>What the printer returned</li>
+            <li>Whether each ISBN was found</li>
+            <li>When it was printed and related job details</li>
+            <li>Which records could not be linked to an ISBN</li>
+          </ul>
+          <p className="mt-3">
+            You can also reopen an earlier run from <strong>Reconciliation History</strong> at the
+            bottom of the page and export again without downloading from the printers.
+          </p>
+        </Section>
+
+        {/* 12. Understanding the 4 Excel Sheets */}
+        <Section id="sheets" title="12. Understanding the 4 Excel sheets">
+          <SheetCard title="Sheet 1 — List A ISBNs">
+            <p>Contains the ISBNs from the uploaded List A.</p>
+            <p className="mt-2">
+              <strong>Purpose:</strong> shows exactly what was provided for printing.
+            </p>
+            <p className="mt-2">Duplicates are preserved.</p>
+          </SheetCard>
+
+          <SheetCard title="Sheet 2 — Printer ISBNs">
+            <p>
+              Contains the ISBNs successfully extracted from printer records, plus printer job
+              information. (If you selected more than one printer, you may see separate tabs such as{' '}
+              <strong>Printer 1 ISBNs</strong>, <strong>Printer 2 ISBNs</strong>,{' '}
+              <strong>Printer 3 ISBNs</strong>.)
+            </p>
+            <p className="mt-2 font-medium text-slate-800">Columns include:</p>
+            <ul className="mt-1 list-disc space-y-0.5 pl-5">
+              <li>ISBN</li>
+              <li>Print Date</li>
+              <li>Job End</li>
+              <li>Print Start</li>
+              <li>Job Accept</li>
+              <li>Result</li>
+              <li>Set Number (total quantity)</li>
+              <li>Output Set (Printed quantity)</li>
+              <li>Printer</li>
+              <li>Job ID</li>
+              <li>Source Filename</li>
+            </ul>
+            <Note>
+              Duplicates are intentionally preserved. If the same ISBN was printed three times, it
+              can appear three times. Rows stay in printer source order.
+            </Note>
+          </SheetCard>
+
+          <SheetCard title="Sheet 3 — Reconciliation">
+            <p>This is the main Operations report. It compares List A ISBNs with printer data.</p>
+            <p className="mt-2 font-medium text-slate-800">It shows:</p>
+            <ul className="mt-1 list-disc space-y-0.5 pl-5">
+              <li>List A ISBN</li>
+              <li>Printer ISBN</li>
+              <li>Print Date</li>
+              <li>Job End</li>
+              <li>Print Start</li>
+              <li>Job Accept</li>
+              <li>Result</li>
+              <li>Set Number (total quantity)</li>
+              <li>Output Set (Printed quantity)</li>
+              <li>Printer</li>
+              <li>Status</li>
+            </ul>
+            <p className="mt-2 text-xs text-slate-500">
+              Job ID and Source Filename are on the Printer ISBNs sheet(s), not on Reconciliation.
+            </p>
+            <p className="mt-2">
+              Each List A ISBN appears once in the reconciliation view (duplicate List A rows are
+              still kept as separate rows).
+            </p>
+            <ul className="mt-2 list-disc space-y-1 pl-5">
+              <li>
+                Found in printer data → <strong>PRESENT</strong>
+              </li>
+              <li>
+                Not found → <strong>NOT FOUND</strong>
+              </li>
+            </ul>
+            <p className="mt-2">
+              If there were multiple print jobs for the same ISBN, the relevant print information is
+              shown together on Sheet 3, while the detailed individual occurrences remain available
+              on Sheet 2.
+            </p>
+          </SheetCard>
+
+          <SheetCard title="Sheet 4 — Skipped ISBNs">
+            <p>
+              Contains printer records where the application could not extract an ISBN.
+            </p>
+            <p className="mt-2">Examples: CE Adjust, Details Counter, or other records without an identifiable ISBN.</p>
+            <p className="mt-2">
+              These records are <strong>not</strong> necessarily errors. They simply mean: the
+              printer gave us a record, but there was no ISBN / identifier that the application
+              could extract from it.
+            </p>
+            <p className="mt-2 font-medium text-slate-800">The sheet shows:</p>
+            <ul className="mt-1 list-disc pl-5">
+              <li>Source Row</li>
+              <li>Printer Record / Filename</li>
+              <li>Reason</li>
+            </ul>
+            <p className="mt-2">(When more than one printer was used, a Printer column may also appear.)</p>
+          </SheetCard>
+        </Section>
+
+        {/* 13. Understanding Statuses */}
+        <Section id="statuses" title="13. Understanding statuses">
+          <div className="overflow-x-auto rounded-md border border-slate-200">
+            <table className="min-w-full text-left text-sm">
+              <thead className="bg-slate-100 text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-3 py-2 font-medium">Status</th>
+                  <th className="px-3 py-2 font-medium">Where you see it</th>
+                  <th className="px-3 py-2 font-medium">Meaning</th>
+                </tr>
+              </thead>
+              <tbody className="text-slate-700">
+                <tr className="border-t border-slate-100 align-top">
+                  <td className="px-3 py-2 font-semibold text-green-800">PRESENT</td>
+                  <td className="px-3 py-2">Excel Reconciliation · Search ISBN</td>
+                  <td className="px-3 py-2">
+                    The ISBN is in List A and was found in the printer records.
+                  </td>
+                </tr>
+                <tr className="border-t border-slate-100 align-top">
+                  <td className="px-3 py-2 font-semibold text-amber-900">NOT FOUND</td>
+                  <td className="px-3 py-2">Excel Reconciliation · Search ISBN</td>
+                  <td className="px-3 py-2">
+                    The ISBN was not found in the printer records for the selected date range (or was
+                    not found anywhere, if you searched an unknown number).
+                  </td>
+                </tr>
+                <tr className="border-t border-slate-100 align-top">
+                  <td className="px-3 py-2 font-semibold text-sky-900">FOUND IN PRINTER DATA</td>
+                  <td className="px-3 py-2">Search ISBN only</td>
+                  <td className="px-3 py-2">
+                    The ISBN was found in printer data but was not part of List A.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </Section>
+
+        {/* 14. Skipped — already covered in sheets; short dedicated note */}
+        <Section id="skipped" title="14. Understanding Skipped ISBNs">
+          <p>
+            <strong>Skipped ISBNs</strong> are printer records without an extractable ISBN. Open
+            Sheet 4 in the Excel report to see the original printer record and the reason.
+          </p>
+          <p className="mt-2">
+            After download, the summary also shows a <strong>Skipped Records</strong> count for
+            quick reference.
+          </p>
+        </Section>
+
+        {/* 15. Common Problems */}
+        <Section id="problems" title="15. Common problems">
+          <Problem
+            title="Printer not connected"
+            solution='Check that your computer is connected to the office printer network and try Test Connection again. If it still fails, ask IT for help.'
+          />
+          <Problem
+            title="No printer records found"
+            solution="Check that the selected printer and date range are correct. Try a wider date range if printing may have happened on other days."
+          />
+          <Problem
+            title="ISBN shows NOT FOUND"
+            solution="Check that the selected date range includes the period when the book was printed."
+          />
+          <Problem
+            title="ISBN appears in Skipped ISBNs"
+            solution="This means the printer record did not contain an ISBN that could be extracted. Check the Skipped ISBNs sheet for the original printer record."
+          />
+          <Problem
+            title="Search gives no result / no data available"
+            solution="Select printers, enter the ISBN, choose a date range that covers when the book was printed, then click Search. Search fetches printer records automatically — List A and a prior reconciliation run are not required. If a printer shows DISCONNECTED, check Connect to Printer."
+          />
+          <Problem
+            title="Excel report is not showing expected data"
+            solution="Check that the correct List A file, printer, and date range were used."
+          />
+          <Problem
+            title="List A will not upload"
+            solution="Use a normal Excel file (.xlsx or .xls) or CSV with an ISBN column. Do not upload a Word document."
+          />
+        </Section>
+
+        {/* 16. Quick Workflow */}
+        <Section id="workflow" title="16. Quick workflow">
+          <ol className="space-y-2 text-sm text-slate-800">
+            <li className="flex items-start gap-2">
+              <span className="font-semibold tabular-nums text-slate-500">1.</span>
+              <span>Open Printing Reconciliation</span>
+            </li>
+            <li className="flex justify-center text-slate-400" aria-hidden>
+              ↓
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="font-semibold tabular-nums text-slate-500">2.</span>
+              <span>
+                The application opens on <strong>Automated Reconciliation</strong>
+              </span>
+            </li>
+            <li className="flex justify-center text-slate-400" aria-hidden>
+              ↓
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="font-semibold tabular-nums text-slate-500">3.</span>
+              <span>Upload List A</span>
+            </li>
+            <li className="flex justify-center text-slate-400" aria-hidden>
+              ↓
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="font-semibold tabular-nums text-slate-500">4.</span>
+              <span>Select Printer</span>
+            </li>
+            <li className="flex justify-center text-slate-400" aria-hidden>
+              ↓
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="font-semibold tabular-nums text-slate-500">5.</span>
+              <span>Select Date Range (From Date / To Date)</span>
+            </li>
+            <li className="flex justify-center text-slate-400" aria-hidden>
+              ↓
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="font-semibold tabular-nums text-slate-500">6.</span>
+              <span>
+                Click <strong>Download Printer Data &amp; Reconcile</strong>
+              </span>
+            </li>
+            <li className="flex justify-center text-slate-400" aria-hidden>
+              ↓
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="font-semibold tabular-nums text-slate-500">7.</span>
+              <span>Review processing results and reconciliation summary</span>
+            </li>
+            <li className="flex justify-center text-slate-400" aria-hidden>
+              ↓
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="font-semibold tabular-nums text-slate-500">8.</span>
+              <span>
+                Use <strong>Search ISBN</strong> if you need to check one book
+              </span>
+            </li>
+            <li className="flex justify-center text-slate-400" aria-hidden>
+              ↓
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="font-semibold tabular-nums text-slate-500">9.</span>
+              <span>
+                Click <strong>Export Normalized Report</strong>
+              </span>
+            </li>
+          </ol>
+
+          <div className="mt-5 rounded-md border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-600">
+            <strong className="text-slate-800">Manual Reconciliation</strong> is available as an
+            emergency / fallback option if automated printer retrieval cannot be used. Most days,
+            stay on Automated Reconciliation.
+          </div>
+
           <div className="mt-4">
             <Link
               to="/automated"
@@ -312,50 +716,70 @@ export function HowToPage() {
               Start Automated Reconciliation
             </Link>
           </div>
-        </section>
+        </Section>
       </main>
     </AppLayout>
   )
 }
 
-function Step({
-  number,
+function Section({
+  id,
   title,
   children,
-  linkTo,
-  linkLabel,
 }: {
-  number: number
+  id: string
   title: string
   children: React.ReactNode
-  linkTo?: string
-  linkLabel?: string
 }) {
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-      <h2 className="text-base font-semibold text-slate-900">
-        Step {number} — {title}
-      </h2>
-      <div className="mt-2 text-sm leading-relaxed text-slate-600">{children}</div>
-      {linkTo && linkLabel ? (
-        <div className="mt-4">
-          <Link
-            to={linkTo}
-            className="inline-flex rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
-          >
-            {linkLabel}
-          </Link>
-        </div>
-      ) : null}
+    <section id={id} className="ui-card-static scroll-mt-20">
+      <h2 className="text-base font-semibold text-slate-900">{title}</h2>
+      <div className="mt-3 text-sm leading-relaxed text-slate-600">{children}</div>
     </section>
   )
 }
 
-function SheetExplain({ title, children }: { title: string; children: React.ReactNode }) {
+function Note({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-md border border-slate-100 bg-slate-50 px-3 py-3">
+    <div className="ui-alert-warn mt-3">
+      <strong>Important:</strong> {children}
+    </div>
+  )
+}
+
+function ExampleBox({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 font-mono text-xs leading-relaxed text-slate-800">
+      {children}
+    </div>
+  )
+}
+
+function Term({ name, children }: { name: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <dt className="font-medium text-slate-800">{name}</dt>
+      <dd className="mt-0.5">{children}</dd>
+    </div>
+  )
+}
+
+function SheetCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="mt-3 rounded-lg border border-blue-100 bg-blue-50/40 px-3 py-3">
       <div className="font-medium text-slate-800">{title}</div>
-      <div className="mt-1">{children}</div>
+      <div className="mt-2 text-sm leading-relaxed text-slate-600">{children}</div>
+    </div>
+  )
+}
+
+function Problem({ title, solution }: { title: string; solution: string }) {
+  return (
+    <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-3 shadow-sm">
+      <div className="font-medium text-slate-800">Problem: {title}</div>
+      <div className="mt-1 text-sm text-slate-600">
+        <strong>Solution:</strong> {solution}
+      </div>
     </div>
   )
 }
