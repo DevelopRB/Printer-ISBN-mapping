@@ -110,7 +110,10 @@ Credentials:
 
 The installer never contains credentials. On first launch each user's
 `%APPDATA%\printing-reconciliation\.env` is seeded from the bundled `env.example` (empty
-passwords); IT then fills in the passwords on that machine.
+passwords). Users then enter each printer's username and password once under **Connect to
+Printer → Printer login → Save login**; the app writes them to that `.env`, applies them
+immediately and keeps them across restarts and updates. The password is never sent back to
+the UI or written to logs.
 
 **Never** put passwords in frontend code or expose them via preload/renderer APIs.
 

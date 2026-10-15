@@ -268,6 +268,8 @@ export type NetworkPrinterConfig = {
 
   password_env: string
 
+  username?: string | null
+
   username_configured: boolean
 
   password_configured: boolean

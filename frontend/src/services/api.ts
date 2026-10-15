@@ -167,6 +167,19 @@ export async function updateNetworkPrinter(
   return data
 }
 
+/** Saves the printer login on this computer. A blank password keeps the saved one. */
+export async function savePrinterCredentials(
+  slot: number,
+  payload: { username: string; password?: string },
+): Promise<NetworkPrinterConfig> {
+  try {
+    const { data } = await api.put(`/network-printers/${slot}/credentials`, payload)
+    return data
+  } catch (err) {
+    throw new Error(errorMessage(err, 'Could not save the printer login.'))
+  }
+}
+
 export async function testNetworkPrinterConnection(
   slot: number,
 ): Promise<ConnectionTestResult> {

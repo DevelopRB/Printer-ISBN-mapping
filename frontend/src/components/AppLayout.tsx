@@ -14,7 +14,7 @@ const appVersion = (
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen">
+    <div className="flex min-h-screen flex-col">
       <nav className="app-navbar sticky top-0 z-50 border-b border-slate-200/90 bg-white/95 shadow-[0_1px_3px_rgb(15_23_42/0.06)] backdrop-blur-md">
         <div className="mx-auto flex max-w-[1400px] items-center gap-2 px-3 py-2 sm:gap-4 sm:px-6 sm:py-2.5">
           <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-4">
@@ -29,11 +29,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               <div className="min-w-0">
                 <div className="truncate text-sm font-semibold tracking-tight text-slate-900">
                   Printing Reconciliation
-                  {appVersion && (
-                    <span className="ml-1.5 text-[11px] font-normal text-slate-400">
-                      v{appVersion}
-                    </span>
-                  )}
                 </div>
                 <div className="hidden text-[11px] text-slate-400 lg:block">
                   Operations print tracking
@@ -118,7 +113,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </nav>
-      {children}
+      <div className="flex-1">{children}</div>
+      {appVersion && (
+        <footer className="border-t border-slate-200/80 py-2 text-center text-xs text-slate-500">
+          Printing Reconciliation · Version {appVersion}
+        </footer>
+      )}
     </div>
   )
 }

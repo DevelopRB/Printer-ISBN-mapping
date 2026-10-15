@@ -15,12 +15,14 @@ from api.schemas import (
     NetworkPrinterConfigOut,
     NetworkPrinterConfigUpdate,
     NetworkPrinterEndpointOption,
+    PrinterCredentialsUpdate,
 )
 from database import get_db
 from logging_config import logger
 from models.models import NetworkPrinterConfig
 from printers.connection import build_adapter_from_config
 from services.printer_config_service import ensure_network_printer_configs
+from services.printer_credentials_store import save_printer_credentials
 from settings import PRINTER_ENDPOINT_OPTIONS, get_printer_credentials, settings
 
 router = APIRouter(prefix="/network-printers", tags=["network-printers"])
@@ -45,6 +47,7 @@ def _to_out(row: NetworkPrinterConfig) -> NetworkPrinterConfigOut:
         display_endpoint=f"{row.host}:{row.port}",
         username_env=row.username_env,
         password_env=row.password_env,
+        username=creds.username(),
         username_configured=creds.has_username_configured(),
         password_configured=creds.has_password_configured(),
         is_enabled=bool(row.is_enabled),
@@ -113,6 +116,38 @@ def update_network_printer(
     db.commit()
     db.refresh(row)
     logger.info("Updated network printer config slot=%s host=%s:%s", row.slot, row.host, row.port)
+    return _to_out(row)
+
+
+@router.put("/{slot}/credentials", response_model=NetworkPrinterConfigOut)
+def update_network_printer_credentials(
+    slot: int,
+    payload: PrinterCredentialsUpdate,
+    db: Session = Depends(get_db),
+):
+    if slot not in (1, 2, 3):
+        raise HTTPException(status_code=404, detail="Printer slot not found.")
+    ensure_network_printer_configs(db)
+    row = db.query(NetworkPrinterConfig).filter(NetworkPrinterConfig.slot == slot).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Printer configuration not found.")
+
+    try:
+        save_printer_credentials(slot, payload.username, payload.password)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from None
+    except OSError:
+        logger.exception("Could not save printer credentials slot=%s", slot)
+        raise HTTPException(
+            status_code=500,
+            detail="Could not save the printer login on this computer.",
+        ) from None
+
+    logger.info(
+        "Saved printer login slot=%s (password %s)",
+        slot,
+        "updated" if payload.password else "unchanged",
+    )
     return _to_out(row)
 
 

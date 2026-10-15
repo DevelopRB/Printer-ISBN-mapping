@@ -1,8 +1,121 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Loader2, RefreshCw } from 'lucide-react'
+import { Eye, EyeOff, KeyRound, Loader2, RefreshCw } from 'lucide-react'
 import { AppLayout } from '../components/AppLayout'
-import { updateNetworkPrinter } from '../services/api'
+import { savePrinterCredentials, updateNetworkPrinter } from '../services/api'
 import { usePrinterHealth } from '../lib/printerHealth'
+import type { NetworkPrinterConfig } from '../types'
+
+function PrinterLoginForm({
+  printer,
+  disabled,
+  onSaved,
+}: {
+  printer: NetworkPrinterConfig
+  disabled: boolean
+  onSaved: () => Promise<void>
+}) {
+  const [username, setUsername] = useState(printer.username || 'admin')
+  const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null)
+
+  useEffect(() => {
+    if (printer.username) setUsername(printer.username)
+  }, [printer.username])
+
+  const hasSavedPassword = printer.password_configured
+  const canSave = !!username.trim() && (hasSavedPassword || !!password) && !saving && !disabled
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!canSave) return
+    setSaving(true)
+    setMessage(null)
+    try {
+      await savePrinterCredentials(printer.slot, {
+        username: username.trim(),
+        ...(password ? { password } : {}),
+      })
+      setPassword('')
+      setShowPassword(false)
+      setMessage({ ok: true, text: 'Saved on this computer. Checking connection…' })
+      await onSaved()
+      setMessage({ ok: true, text: 'Saved on this computer.' })
+    } catch (err) {
+      setMessage({
+        ok: false,
+        text: err instanceof Error ? err.message : 'Could not save the printer login.',
+      })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <form onSubmit={handleSave} className="space-y-2 rounded-lg border border-slate-200 p-2.5">
+      <div className="flex items-center justify-between gap-2">
+        <span className="inline-flex items-center gap-1.5 font-semibold text-slate-700">
+          <KeyRound size={13} aria-hidden />
+          Printer login
+        </span>
+        <span
+          className={`rounded px-1.5 py-0.5 text-[11px] font-medium ${
+            hasSavedPassword ? 'bg-green-50 text-green-800' : 'bg-amber-50 text-amber-800'
+          }`}
+        >
+          {hasSavedPassword ? 'Password saved' : 'Password not set'}
+        </span>
+      </div>
+      <label className="block">
+        Username
+        <input
+          className="ui-input mt-1 h-9 py-1.5 text-xs text-slate-800"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          autoComplete="off"
+          disabled={saving}
+        />
+      </label>
+      <label className="block">
+        Password
+        <div className="relative mt-1">
+          <input
+            className="ui-input h-9 py-1.5 pr-9 text-xs text-slate-800"
+            type={showPassword ? 'text' : 'password'}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder={hasSavedPassword ? 'Leave blank to keep saved password' : 'Enter printer password'}
+            autoComplete="new-password"
+            disabled={saving}
+          />
+          <button
+            type="button"
+            className="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-slate-400 hover:text-slate-700"
+            onClick={() => setShowPassword((v) => !v)}
+            aria-label={showPassword ? 'Hide password' : 'Show password'}
+            tabIndex={-1}
+          >
+            {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+          </button>
+        </div>
+      </label>
+      <button type="submit" className="ui-btn-secondary w-full" disabled={!canSave}>
+        {saving ? (
+          <>
+            <Loader2 className="animate-spin" size={14} />
+            Saving…
+          </>
+        ) : (
+          'Save login'
+        )}
+      </button>
+      {message && (
+        <div className={message.ok ? 'text-green-700' : 'text-red-700'}>{message.text}</div>
+      )}
+    </form>
+  )
+}
 
 export function PrinterConfigPage() {
   const {
@@ -90,7 +203,8 @@ export function PrinterConfigPage() {
             <h1 className="ui-page-title">Connect to Printer</h1>
             <p className="ui-page-subtitle">
               Status reflects the latest live reachability check (auto-refreshed about every 30
-              seconds). Passwords stay on the server and are never shown in the browser.
+              seconds). Printer passwords are saved only on this computer and are never shown
+              again.
             </p>
           </div>
           <button
@@ -106,10 +220,12 @@ export function PrinterConfigPage() {
         {error && <div className="ui-alert-error">{error}</div>}
 
         <div className="ui-alert-warn">
-          <div className="font-medium">Admin / IT only</div>
+          <div className="font-medium">First-time setup on this computer</div>
           <div className="mt-1">
-            Printer passwords are configured on the server. If a connection fails, ask IT to
-            confirm the computer is on the printer network and that printer credentials are set.
+            Enter the username and password for each printer under <b>Printer login</b> and
+            click <b>Save login</b>. You only need to do this once — they are used automatically
+            every time the app starts and are kept when the app updates. If a printer still
+            won&apos;t connect, check that this computer is on the printer network.
           </div>
         </div>
 
@@ -215,6 +331,14 @@ export function PrinterConfigPage() {
                       </div>
                     )}
                     <div>Last checked: {checkedAt ? new Date(checkedAt).toLocaleTimeString() : '—'}</div>
+                    <PrinterLoginForm
+                      printer={printer}
+                      disabled={savingSlot === printer.slot}
+                      onSaved={async () => {
+                        await reloadPrinterNames()
+                        await checkSlot(printer.slot)
+                      }}
+                    />
                     <button
                       type="button"
                       className="ui-btn-primary w-full"

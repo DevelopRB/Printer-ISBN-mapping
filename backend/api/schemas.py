@@ -147,6 +147,14 @@ class NetworkPrinterConfigUpdate(BaseModel):
             object.__setattr__(self, "protocol", proto)
 
 
+class PrinterCredentialsUpdate(BaseModel):
+    # No Field constraints: a 422 would echo the submitted password back. Validated in
+    # services.printer_credentials_store instead.
+    username: str
+    # Omit or leave blank to keep the saved password.
+    password: str | None = None
+
+
 class NetworkPrinterEndpointOption(BaseModel):
     protocol: str
     port: int
@@ -166,7 +174,8 @@ class NetworkPrinterConfigOut(BaseModel):
     display_endpoint: str
     username_env: str
     password_env: str
-    # Credential presence flags only — never the secret values
+    # Credential presence flags only — never the password value
+    username: str | None = None
     username_configured: bool
     password_configured: bool
     is_enabled: bool
