@@ -5,7 +5,7 @@
  * Credentials stay in userData/.env (backend only) — never sent to renderer.
  */
 
-const { app, BrowserWindow, dialog, shell } = require('electron')
+const { app, BrowserWindow, dialog, session, shell } = require('electron')
 const path = require('path')
 const fs = require('fs')
 const http = require('http')
@@ -359,6 +359,8 @@ app.whenReady().then(async () => {
     return
   }
 
+  // The UI is served locally, so caching gains nothing and could show a pre-update UI.
+  await session.defaultSession.clearCache().catch(() => {})
   await createWindow(chosenPort)
   setupAutoUpdates(envPaths.logsDir)
 

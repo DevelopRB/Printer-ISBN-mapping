@@ -78,9 +78,13 @@ def _mount_frontend() -> None:
     if assets.is_dir():
         app.mount("/assets", StaticFiles(directory=str(assets)), name="assets")
 
+    # index.html must be revalidated so an updated app never shows a cached old UI;
+    # hashed /assets files are safe to cache.
+    no_cache = {"Cache-Control": "no-cache"}
+
     @app.get("/")
     async def spa_index():
-        return FileResponse(dist / "index.html")
+        return FileResponse(dist / "index.html", headers=no_cache)
 
     @app.get("/{full_path:path}")
     async def spa_fallback(full_path: str):
@@ -89,8 +93,8 @@ def _mount_frontend() -> None:
             return JSONResponse(status_code=404, content={"detail": "Not found"})
         candidate = dist / full_path
         if candidate.is_file():
-            return FileResponse(candidate)
-        return FileResponse(dist / "index.html")
+            return FileResponse(candidate, headers=no_cache)
+        return FileResponse(dist / "index.html", headers=no_cache)
 
     logger.info("Serving frontend from %s", dist)
 
