@@ -1,6 +1,6 @@
 {
   "name": "printing-reconciliation",
-  "version": "1.0.0",
+  "version": "1.1.1",
   "description": "Printing Reconciliation — desktop app for Operations",
   "author": "Rare Biblio",
   "private": true,
@@ -11,8 +11,9 @@
     "build:backend": "powershell -ExecutionPolicy Bypass -File scripts/build-backend.ps1",
     "build": "npm run build:frontend && npm run build:backend",
     "check:secrets": "powershell -ExecutionPolicy Bypass -File scripts/check-no-secrets.ps1",
-    "dist:win": "npm run build && npm run check:secrets && electron-builder --win nsis --x64",
-    "pack:dir": "npm run build && npm run check:secrets && electron-builder --win dir --x64"
+    "dist:win": "npm run build && npm run check:secrets && electron-builder --win nsis --x64 --publish never",
+    "pack:dir": "npm run build && npm run check:secrets && electron-builder --win dir --x64 --publish never",
+    "release": "powershell -ExecutionPolicy Bypass -File scripts/release.ps1"
   },
   "devDependencies": {
     "electron": "^33.2.1",
@@ -66,6 +67,17 @@
       "uninstallDisplayName": "Printing Reconciliation",
       "deleteAppDataOnUninstall": false
     },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "DevelopRB",
+        "repo": "Printer-ISBN-mapping",
+        "releaseType": "release"
+      }
+    ],
     "asar": true
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
   }
 }

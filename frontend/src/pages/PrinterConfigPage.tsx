@@ -65,6 +65,22 @@ export function PrinterConfigPage() {
     [draftNames, reloadPrinterNames],
   )
 
+  const handleSelectEndpoint = useCallback(
+    async (slot: number, protocol: string, port: number) => {
+      setSavingSlot(slot)
+      setError(null)
+      try {
+        await updateNetworkPrinter(slot, { protocol, port })
+        await refreshConfigs()
+      } catch {
+        setError('Could not change the printer connection address.')
+      } finally {
+        setSavingSlot(null)
+      }
+    },
+    [refreshConfigs],
+  )
+
   return (
     <AppLayout>
       <main className="ui-page">
@@ -171,10 +187,33 @@ export function PrinterConfigPage() {
                   </p>
 
                   <div className="mt-auto space-y-2 border-t border-slate-100 pt-3 text-xs text-slate-500">
-                    <div>
-                      Endpoint:{' '}
-                      <span className="font-mono text-slate-700">{printer.display_endpoint}</span>
-                    </div>
+                    {printer.endpoint_options && printer.endpoint_options.length > 1 ? (
+                      <label className="block">
+                        Connect using:
+                        <select
+                          className="ui-input mt-1 h-9 py-1.5 font-mono text-xs text-slate-800"
+                          value={`${printer.protocol}:${printer.port}`}
+                          disabled={savingSlot === printer.slot || phase === 'checking'}
+                          onChange={(e) => {
+                            const opt = printer.endpoint_options?.find(
+                              (o) => `${o.protocol}:${o.port}` === e.target.value,
+                            )
+                            if (opt) void handleSelectEndpoint(printer.slot, opt.protocol, opt.port)
+                          }}
+                        >
+                          {printer.endpoint_options.map((o) => (
+                            <option key={`${o.protocol}:${o.port}`} value={`${o.protocol}:${o.port}`}>
+                              {o.display_endpoint} ({o.protocol.toUpperCase()})
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : (
+                      <div>
+                        Endpoint:{' '}
+                        <span className="font-mono text-slate-700">{printer.display_endpoint}</span>
+                      </div>
+                    )}
                     <div>Last checked: {checkedAt ? new Date(checkedAt).toLocaleTimeString() : '—'}</div>
                     <button
                       type="button"

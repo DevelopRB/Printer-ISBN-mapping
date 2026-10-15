@@ -10,13 +10,18 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from api.schemas import ConnectionTestOut, NetworkPrinterConfigOut, NetworkPrinterConfigUpdate
+from api.schemas import (
+    ConnectionTestOut,
+    NetworkPrinterConfigOut,
+    NetworkPrinterConfigUpdate,
+    NetworkPrinterEndpointOption,
+)
 from database import get_db
 from logging_config import logger
 from models.models import NetworkPrinterConfig
 from printers.connection import build_adapter_from_config
 from services.printer_config_service import ensure_network_printer_configs
-from settings import get_printer_credentials, settings
+from settings import PRINTER_ENDPOINT_OPTIONS, get_printer_credentials, settings
 
 router = APIRouter(prefix="/network-printers", tags=["network-printers"])
 printers_debug_router = APIRouter(prefix="/printers", tags=["printers-debug"])
@@ -50,6 +55,14 @@ def _to_out(row: NetworkPrinterConfig) -> NetworkPrinterConfigOut:
         last_connection_latency_ms=row.last_connection_latency_ms,
         last_checked_at=row.last_checked_at,
         verify_ssl=settings.printer_verify_ssl if protocol == "https" else True,
+        endpoint_options=[
+            NetworkPrinterEndpointOption(
+                protocol=opt["protocol"],
+                port=opt["port"],
+                display_endpoint=f"{row.host}:{opt['port']}",
+            )
+            for opt in PRINTER_ENDPOINT_OPTIONS.get(row.slot, [])
+        ],
     )
 
 

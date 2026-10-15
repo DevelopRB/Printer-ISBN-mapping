@@ -8,6 +8,10 @@ const linkActive = 'bg-[var(--accent)] font-semibold text-white shadow-sm'
 const linkInactive =
   'font-medium text-slate-600 hover:bg-sky-50 hover:text-sky-900'
 
+const appVersion = (
+  window as Window & { printingReconciliation?: { version?: string | null } }
+).printingReconciliation?.version
+
 export function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen">
@@ -25,6 +29,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               <div className="min-w-0">
                 <div className="truncate text-sm font-semibold tracking-tight text-slate-900">
                   Printing Reconciliation
+                  {appVersion && (
+                    <span className="ml-1.5 text-[11px] font-normal text-slate-400">
+                      v{appVersion}
+                    </span>
+                  )}
                 </div>
                 <div className="hidden text-[11px] text-slate-400 lg:block">
                   Operations print tracking

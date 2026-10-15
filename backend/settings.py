@@ -78,6 +78,15 @@ DEFAULT_PRINTER_ENDPOINTS = {
     },
 }
 
+# Alternate endpoints Operations can switch between (same host). Printer 3 answers
+# on HTTP 30091 or HTTPS 30092 depending on the day; protocol and port must change together.
+PRINTER_ENDPOINT_OPTIONS: dict[int, list[dict]] = {
+    3: [
+        {"protocol": "http", "port": 30091},
+        {"protocol": "https", "port": 30092},
+    ],
+}
+
 PRINTER_CREDENTIAL_REFS = {
     1: PrinterCredentialRef(1, "PRINTER_1_USERNAME", "PRINTER_1_PASSWORD"),
     2: PrinterCredentialRef(2, "PRINTER_2_USERNAME", "PRINTER_2_PASSWORD"),

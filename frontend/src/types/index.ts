@@ -288,6 +288,8 @@ export type NetworkPrinterConfig = {
 
   verify_ssl: boolean
 
+  endpoint_options?: { protocol: string; port: number; display_endpoint: string }[]
+
 }
 
 

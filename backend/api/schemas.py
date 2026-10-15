@@ -147,6 +147,12 @@ class NetworkPrinterConfigUpdate(BaseModel):
             object.__setattr__(self, "protocol", proto)
 
 
+class NetworkPrinterEndpointOption(BaseModel):
+    protocol: str
+    port: int
+    display_endpoint: str
+
+
 class NetworkPrinterConfigOut(BaseModel):
     id: int
     slot: int
@@ -171,6 +177,7 @@ class NetworkPrinterConfigOut(BaseModel):
     last_connection_latency_ms: int | None = None
     last_checked_at: datetime | None = None
     verify_ssl: bool
+    endpoint_options: list[NetworkPrinterEndpointOption] = []
 
     model_config = {"from_attributes": True}
 

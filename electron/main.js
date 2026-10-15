@@ -10,10 +10,11 @@ const path = require('path')
 const fs = require('fs')
 const http = require('http')
 const net = require('net')
-const { spawn } = require('child_process')
+const { spawn, spawnSync } = require('child_process')
 
 const APP_NAME = 'Printing Reconciliation'
 const DEFAULT_PORT = 18765
+const UPDATE_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000
 
 /** @type {BrowserWindow | null} */
 let mainWindow = null
@@ -21,6 +22,7 @@ let mainWindow = null
 let backendProcess = null
 let chosenPort = DEFAULT_PORT
 let isQuitting = false
+let backendStopped = false
 
 const gotLock = app.requestSingleInstanceLock()
 if (!gotLock) {
@@ -219,12 +221,15 @@ function startBackend(port, envPaths) {
   return backendProcess
 }
 
+// Synchronous so the API exe is released before an update installer replaces it.
 function stopBackend() {
+  if (backendStopped) return
+  backendStopped = true
   if (backendProcess && !backendProcess.killed) {
     const pid = backendProcess.pid
     try {
       if (process.platform === 'win32' && pid) {
-        spawn('taskkill', ['/pid', String(pid), '/f', '/t'], {
+        spawnSync('taskkill', ['/pid', String(pid), '/f', '/t'], {
           windowsHide: true,
           stdio: 'ignore',
         })
@@ -240,7 +245,7 @@ function stopBackend() {
   // Ensure no orphan API process remains (Windows)
   if (process.platform === 'win32') {
     try {
-      spawn('taskkill', ['/IM', 'PrintingReconciliationAPI.exe', '/F', '/T'], {
+      spawnSync('taskkill', ['/IM', 'PrintingReconciliationAPI.exe', '/F', '/T'], {
         windowsHide: true,
         stdio: 'ignore',
       })
@@ -248,6 +253,50 @@ function stopBackend() {
       // ignore
     }
   }
+}
+
+function setupAutoUpdates(logsDir) {
+  if (isDev()) return
+  const { autoUpdater } = require('electron-updater')
+
+  const logStream = fs.createWriteStream(path.join(logsDir, 'updater.log'), { flags: 'a' })
+  const log = (level) => (msg) =>
+    logStream.write(`[${new Date().toISOString()}] ${level} ${msg}\n`)
+  autoUpdater.logger = { info: log('info'), warn: log('warn'), error: log('error'), debug: () => {} }
+  autoUpdater.autoDownload = true
+  autoUpdater.autoInstallOnAppQuit = true
+
+  // Offline / GitHub unreachable must never interrupt users; it is only logged.
+  autoUpdater.on('error', (err) => log('error')(err?.message ?? String(err)))
+
+  let promptedVersion = null
+  autoUpdater.on('update-downloaded', async (info) => {
+    if (promptedVersion === info.version) return
+    promptedVersion = info.version
+    const options = {
+      type: 'info',
+      title: APP_NAME,
+      message: `A new version (${info.version}) is ready.`,
+      detail:
+        `You are using version ${app.getVersion()}.\n\n` +
+        'Restart now to update, or choose Later and it will be installed when you close the app.',
+      buttons: ['Restart Now', 'Later'],
+      defaultId: 0,
+      cancelId: 1,
+    }
+    const { response } = mainWindow
+      ? await dialog.showMessageBox(mainWindow, options)
+      : await dialog.showMessageBox(options)
+    if (response === 0) {
+      isQuitting = true
+      stopBackend()
+      autoUpdater.quitAndInstall(true, true)
+    }
+  })
+
+  const check = () => autoUpdater.checkForUpdates().catch(() => {})
+  check()
+  setInterval(check, UPDATE_CHECK_INTERVAL_MS)
 }
 
 function createWindow(port) {
@@ -261,6 +310,7 @@ function createWindow(port) {
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
+      additionalArguments: [`--app-version=${app.getVersion()}`],
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
@@ -310,6 +360,7 @@ app.whenReady().then(async () => {
   }
 
   await createWindow(chosenPort)
+  setupAutoUpdates(envPaths.logsDir)
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
